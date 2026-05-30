@@ -1,0 +1,12 @@
+---
+# K3s version to install. Empty string means latest stable.
+k3s_version: ""
+
+# URL for the k3s installation script
+k3s_install_url: "https://get.k3s.io"
+
+# Server arguments passed via INSTALL_K3S_EXEC
+k3s_server_args: "server --disable traefik --write-kubeconfig-mode 644"
+
+# Additional flags (appended to k3s_server_args if set)
+k3s_extra_server_args: ""
