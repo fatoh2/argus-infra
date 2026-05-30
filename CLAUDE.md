@@ -7,7 +7,7 @@ configured with Ansible, and operated via ArgoCD GitOps.
 ## Stack
 - **Provisioning**: Terraform/OpenTofu + Hetzner Cloud provider
 - **Configuration**: Ansible
-- **Orchestration**: Kubernetes (kubeadm)
+- **Orchestration**: Kubernetes via **k3s** (not kubeadm — k3s is lighter, single binary, same K8s API)
 - **GitOps**: ArgoCD (app-of-apps pattern)
 - **Ingress**: NGINX + cert-manager (Let's Encrypt)
 - **Secrets**: External Secrets Operator + Doppler
