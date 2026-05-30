@@ -21,7 +21,7 @@ apt-get update -qq && apt-get upgrade -y -qq
 apt-get install -y -qq \
   curl wget git jq unzip build-essential \
   software-properties-common gnupg ca-certificates \
-  python3.11 python3.11-venv python3-pip \
+  python3 python3-venv python3-pip \
   sqlite3 libsqlite3-dev
 
 # ── Node.js 20 ────────────────────────────────────────────────────────────────
@@ -67,7 +67,7 @@ chown -R "$ARGUS_USER:$ARGUS_USER" "$ARGUS_DIR"
 
 # ── Python venv ───────────────────────────────────────────────────────────────
 echo "[8/9] Creating Python virtual environment..."
-python3.11 -m venv "$ARGUS_DIR/venv"
+python3 -m venv "$ARGUS_DIR/venv"
 "$PIP" install -q --upgrade pip
 
 # ── Git global config for argus user ─────────────────────────────────────────
