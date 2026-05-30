@@ -1,0 +1,12 @@
+.env
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+*.tfvars
+!*.tfvars.example
+kubeconfig
+kubeconfig.yaml
+*.pem
+*.key
+ansible/inventory/hosts
