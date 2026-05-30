@@ -51,7 +51,7 @@ mv hcloud /usr/local/bin/ && rm hcloud-linux-amd64.tar.gz
 
 # ── Ansible ───────────────────────────────────────────────────────────────────
 echo "[6/9] Installing Ansible..."
-pip3 install -q ansible
+apt-get install -y -qq ansible
 
 # ── argus user + directories ──────────────────────────────────────────────────
 echo "[7/9] Creating argus user and directories..."
