@@ -1,0 +1,7 @@
+---
+common_timezone: UTC
+common_packages:
+  - curl
+  - git
+  - jq
+  - htop

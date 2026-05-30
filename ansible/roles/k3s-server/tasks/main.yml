@@ -1,0 +1,70 @@
+---
+- name: Download k3s install script
+  ansible.builtin.get_url:
+    url: "{{ k3s_install_url }}"
+    dest: /tmp/k3s-install.sh
+    mode: "0700"
+    force: false
+
+- name: Install k3s server  # noqa: command-instead-of-shell
+  ansible.builtin.shell:
+    cmd: /tmp/k3s-install.sh
+    creates: /usr/local/bin/k3s
+  environment:
+    INSTALL_K3S_EXEC: "{{ k3s_server_args }}{{ ' ' + k3s_extra_server_args if k3s_extra_server_args else '' }}"
+    INSTALL_K3S_VERSION: "{{ k3s_version | default('', true) }}"
+  notify: Restart k3s
+
+- name: Enable and start k3s service
+  ansible.builtin.systemd:
+    name: k3s
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Wait for k3s service to be active
+  ansible.builtin.systemd:
+    name: k3s
+  register: k3s_service_status
+  until: k3s_service_status.status.ActiveState == "active"
+  retries: 20
+  delay: 5
+
+- name: Wait for kubeconfig to be written
+  ansible.builtin.wait_for:
+    path: /etc/rancher/k3s/k3s.yaml
+    state: present
+    timeout: 120
+
+- name: Wait for node-token to be written
+  ansible.builtin.wait_for:
+    path: /var/lib/rancher/k3s/server/node-token
+    state: present
+    timeout: 120
+
+- name: Read k3s node-token
+  ansible.builtin.slurp:
+    src: /var/lib/rancher/k3s/server/node-token
+  register: k3s_node_token_b64
+  no_log: true
+
+- name: Set k3s_node_token fact
+  ansible.builtin.set_fact:
+    k3s_node_token: "{{ k3s_node_token_b64.content | b64decode | trim }}"
+    cacheable: true
+  no_log: true
+
+- name: Fetch kubeconfig to local kubeconfig/homelab.yaml
+  ansible.builtin.fetch:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: "{{ playbook_dir }}/../kubeconfig/homelab.yaml"
+    flat: true
+    mode: "0600"
+
+- name: Replace 127.0.0.1 with control-plane public IP in fetched kubeconfig
+  ansible.builtin.replace:
+    path: "{{ playbook_dir }}/../kubeconfig/homelab.yaml"
+    regexp: 'https://127\.0\.0\.1:6443'
+    replace: "https://{{ ansible_host }}:6443"
+  delegate_to: localhost
+  become: false
