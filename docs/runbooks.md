@@ -34,6 +34,7 @@ Full procedure to provision a new cluster from scratch: Terraform → Ansible �
 cd /opt/argus/workspaces/argus-infra/terraform/environments/homelab
 
 # 1. Authenticate to Hetzner (set token in tfvars or env)
+# ⚠️  Set via Doppler CLI or password manager — avoid hardcoding in shell
 export HCLOUD_TOKEN="<your-hetzner-api-token>"
 
 # 2. Initialise providers
@@ -58,17 +59,18 @@ terraform apply tfplan
 cd /opt/argus/workspaces/argus-infra/ansible
 
 # 1. Update inventory with IPs from Terraform output
-# Edit ansible/inventory/hosts (this file is gitignored — never commit it)
-vim ansible/inventory/hosts
+# Edit inventory/hosts (this file is gitignored — never commit it)
+vim inventory/hosts
 
 # 2. Test SSH connectivity
-ansible all -m ping -i ansible/inventory/hosts
+ansible all -m ping -i inventory/hosts
 
 # 3. Run the k3s install playbook (control-plane first)
-ansible-playbook -i ansible/inventory/hosts ansible/playbooks/k3s-install.yml
+ansible-playbook -i inventory/hosts playbooks/k3s-install.yml
 
 # 4. Verify cluster is healthy
 export KUBECONFIG=/opt/argus/workspaces/argus-infra/kubeconfig/homelab.yaml
+# (this path is gitignored — never commit this file)
 kubectl get nodes -o wide
 ```
 
@@ -83,6 +85,8 @@ argus-work-01  Ready    <none>                 1m    v1.31.x+k3s1
 ### Phase 3 — ArgoCD Bootstrap
 
 ```bash
+cd /opt/argus/workspaces/argus-infra && git pull origin main
+
 export KUBECONFIG=/opt/argus/workspaces/argus-infra/kubeconfig/homelab.yaml
 
 # 1. Create the argocd namespace
@@ -101,7 +105,7 @@ helm install argocd . \
 # 4. Verify ArgoCD pods are running
 kubectl get pods -n argocd
 
-# 5. Apply the ArgoCd AppProject and root app-of-apps
+# 5. Apply the ArgoCD AppProject and root app-of-apps
 kubectl apply -f /opt/argus/workspaces/argus-infra/k8s/argocd/project.yaml
 kubectl apply -f /opt/argus/workspaces/argus-infra/k8s/argocd/root-app.yaml
 
@@ -190,8 +194,8 @@ cd terraform/environments/homelab
 terraform plan && terraform apply
 
 # 3. Re-run the Ansible k3s-worker playbook targeting the new node
-ansible-playbook -i ansible/inventory/hosts \
-  ansible/playbooks/k3s-install.yml \
+ansible-playbook -i inventory/hosts \
+  playbooks/k3s-install.yml \
   --limit <new-node-ip>
 
 # 4. Verify the new node joins
@@ -199,6 +203,8 @@ kubectl get nodes --watch
 ```
 
 #### Step 4: Uncordon (if repaired, not replaced)
+
+> **Note:** Only run `kubectl uncordon` when the **same node** was repaired in place. If the node was reprovisioned (Step 3b), the node name will have changed — skip this step.
 
 ```bash
 kubectl uncordon <node-name>
