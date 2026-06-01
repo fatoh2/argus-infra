@@ -7,10 +7,11 @@ configured with Ansible, and operated via ArgoCD GitOps.
 ## Stack
 - **Provisioning**: Terraform/OpenTofu + Hetzner Cloud provider
 - **Configuration**: Ansible
-- **Orchestration**: Kubernetes (kubeadm)
+- **Orchestration**: Kubernetes via **k3s** (not kubeadm — k3s is lighter, single binary, same K8s API)
 - **GitOps**: ArgoCD (app-of-apps pattern)
 - **Ingress**: NGINX + cert-manager (Let's Encrypt)
 - **Secrets**: External Secrets Operator + Doppler
+  - **Note on Secrets**: Ensure all secret management configurations (External Secrets Operator, Doppler) are thoroughly reviewed for proper encryption, access control, and rotation policies. Avoid exposing secrets in plain text.
 - **Monitoring**: Prometheus + Grafana + Loki
 - **Database**: PostgreSQL + pgbackrest → Backblaze B2
 - **Queue**: Redis
