@@ -19,13 +19,13 @@ jobs:
 
       - name: Terraform Validate
         run: |
-          cd terraform
+          cd terraform/environments/homelab
           terraform init
           terraform validate
 
       - name: Terraform Plan (no apply)
         run: |
-          cd terraform
+          cd terraform/environments/homelab
           terraform plan -no-color
 
       - name: Ansible Syntax Check
