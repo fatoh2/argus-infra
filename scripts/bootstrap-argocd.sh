@@ -7,6 +7,8 @@ log() {
 }
 
 error_exit() {
+  log "Last command: ${last_command}"
+  local last_command="${BASH_COMMAND}"
   log "ERROR: $1" >&2
   exit 1
 }
