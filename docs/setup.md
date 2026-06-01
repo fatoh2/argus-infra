@@ -36,7 +36,7 @@ You will also need:
 3.  Apply Terraform configurations (e.g., to provision cloud resources):
     ```bash
     cd terraform/environments/homelab
-    terraform apply
+    terraform apply # You may be prompted to confirm. Use -auto-approve for non-interactive runs.
     cd ../../.. # Go back to root
     ```
 
@@ -61,6 +61,7 @@ You will also need:
 7.  Access ArgoCD UI:
     ```bash
     argocd admin initial-password -n argocd
+    # Default username is admin.
     # Port forward the ArgoCD server:
     kubectl port-forward svc/argocd-server -n argocd 8080:443
     ```
@@ -79,7 +80,9 @@ You will also need:
 To ensure your changes are valid, run the sanity checks:
 
 ```bash
-.github/workflows/sanity-checks.yml
+# For local testing, you can manually run the commands listed within the workflow file or use a tool like `act`.
+# Example using act (requires Docker):
+# act -j sanity-checks --container-architecture linux/amd64
 ```
 *Note: This is a GitHub Actions workflow. You would typically push your changes and let GitHub Actions run it. For local testing, you can use `act` or manually run the commands within the workflow file.*
 
