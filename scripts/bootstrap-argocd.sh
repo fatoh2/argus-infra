@@ -21,6 +21,7 @@ log "Installing ArgoCD into Kubernetes"
 kubectl create namespace argocd || log "Namespace argocd already exists, continuing."
 kubectl apply -n argocd -f k8s/argocd/install.yaml || error_exit "Failed to apply ArgoCD install manifests"
 log "Applying ArgoCD configuration"
+kubectl apply -n argocd -f k8s/argocd/config/argocd-cmd-params-cm.yaml || error_exit "Failed to apply ArgoCD command parameters config"
 kubectl apply -n argocd -f k8s/argocd/config/argocd-rbac-cm.yaml || error_exit "Failed to apply ArgoCD RBAC config"
 kubectl apply -n argocd -f k8s/argocd/config/argocd-cm.yaml || error_exit "Failed to apply ArgoCD general config"
 

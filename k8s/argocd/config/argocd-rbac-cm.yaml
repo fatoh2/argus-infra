@@ -9,6 +9,7 @@ metadata:
 data:
   # Policy for restricting access to the argocd namespace
   policy.csv: |
+    # NOTE: This is a broad admin policy. For production, consider stricter RBAC roles and ArgoCD Projects.
     p, role:admin, applications, *, argocd/*, allow
     p, role:admin, clusters, *, *, allow
     p, role:admin, repositories, *, *, allow

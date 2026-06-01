@@ -35,3 +35,27 @@ Secrets are managed using External Secrets Operator and Doppler. Ensure all secr
 ## 6. Ingress and TLS
 
 NGINX is used for ingress, with `cert-manager` handling TLS certificates from Let's Encrypt. Ensure TLS is correctly configured and certificates are properly rotated to prevent security vulnerabilities. This includes configuring `cert-manager` issuers and certificate resources, and ensuring TLS secrets are correctly referenced by ingress resources.
+
+### Security Considerations
+
+*   **ArgoCD RBAC:** The default  provides a broad admin role. For production environments, it is crucial to implement stricter RBAC policies and leverage ArgoCD Projects to restrict application deployments to specific namespaces and control user permissions.
+*   **Secrets Management:** This setup integrates with External Secrets Operator and Doppler. Ensure that all secret management configurations are thoroughly reviewed for proper encryption, access control, and rotation policies. Never commit sensitive information directly to Git.
+*   **TLS Configuration:** For production, ensure that Ingress controllers (e.g., NGINX) are configured with TLS using  for automatic certificate provisioning and renewal. Verify that certificates are correctly managed and rotated to prevent man-in-the-middle attacks.
+
+### Operational Best Practices
+
+*   **Git Repository Validation:** Implement pre-commit hooks or CI checks to validate the structure and content of ArgoCD application manifests in the Git repository. This helps prevent malformed configurations from reaching the cluster.
+*   **Self-Healing and Pruning:** Be aware that  and  can lead to race conditions if manual changes are made directly to the cluster. Clearly define operational procedures for when direct cluster modifications are allowed and how they should be reconciled with GitOps.
+*   **Modular Manifests:** Break down large Kubernetes manifests into smaller, modular files. This improves readability, maintainability, and can prevent performance issues with ArgoCD sync operations.
+
+### Security Considerations
+
+*   **ArgoCD RBAC:** The default `argocd-rbac-cm.yaml` provides a broad admin role. For production environments, it is crucial to implement stricter RBAC policies and leverage ArgoCD Projects to restrict application deployments to specific namespaces and control user permissions.
+*   **Secrets Management:** This setup integrates with External Secrets Operator and Doppler. Ensure that all secret management configurations are thoroughly reviewed for proper encryption, access control, and rotation policies. Never commit sensitive information directly to Git.
+*   **TLS Configuration:** For production, ensure that Ingress controllers (e.g., NGINX) are configured with TLS using `cert-manager` for automatic certificate provisioning and renewal. Verify that certificates are correctly managed and rotated to prevent man-in-the-middle attacks.
+
+### Operational Best Practices
+
+*   **Git Repository Validation:** Implement pre-commit hooks or CI checks to validate the structure and content of ArgoCD application manifests in the Git repository. This helps prevent malformed configurations from reaching the cluster.
+*   **Self-Healing and Pruning:** Be aware that `syncPolicy.automated.selfHeal: true` and `prune: true` can lead to race conditions if manual changes are made directly to the cluster. Clearly define operational procedures for when direct cluster modifications are allowed and how they should be reconciled with GitOps.
+*   **Modular Manifests:** Break down large Kubernetes manifests into smaller, modular files. This improves readability, maintainability, and can prevent performance issues with ArgoCD sync operations.
