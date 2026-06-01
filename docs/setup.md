@@ -9,7 +9,7 @@ This document outlines the steps to set up ArgoCD on the Kubernetes cluster usin
 
  Find more information at: https://kubernetes.io/docs/reference/kubectl/
 
-If your kubeconfig is not at the default location, ensure the KUBECONFIG environment variable is set.
+Ensure the `KUBECONFIG` environment variable is set if your kubeconfig file is not at the default location (`~/.kube/config`).
 
 ## Steps
 
