@@ -38,7 +38,7 @@ This document outlines the steps to set up ArgoCD on the Kubernetes cluster usin
 
     
     ```bash
-    kubectl port-forward svc/argocd-server -n argocd 8080:443\n\nThen navigate to https://localhost:8080 in your browser. The username is `admin`.
+    kubectl port-forward svc/argocd-server -n argocd 8080:443
     ```
 
 
