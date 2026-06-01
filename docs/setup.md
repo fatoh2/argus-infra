@@ -218,110 +218,53 @@ argocd login localhost:8080 --username admin --password $(kubectl -n argocd get 
 
 ### Deploy ArgoCD Applications
 
-ArgoCD applications are defined in the `argocd/apps/` directory. To deploy them, either:
+ArgoCD applications are defined in the `k8s/argocd/apps/` directory. The root application (`app-of-apps.yaml`) manages all child applications.
 
-1. **Via the ArgoCD UI:** Click "New App" and configure the source pointing to this repository.
-2. **Via the ArgoCD CLI (requires ArgoCD CLI installed):**
-   ```bash
-   argocd app create <app-name> --repo https://github.com/fatoh2/argus-infra.git --path argocd/apps/<app-name> --dest-server https://kubernetes.default.svc --dest-namespace <namespace>
-   ```
-3. **Via kubectl:** Apply the Application manifests directly:
-   ```bash
-   kubectl apply -f argocd/apps/<app-name>/application.yaml
-   ```
-
-
-## 5. Deploy Cluster Applications via ArgoCD
-
-Once ArgoCD is bootstrapped, deploy the cluster infrastructure applications. These are defined as ArgoCD Application manifests in `k8s/argocd/apps/` and can be applied in dependency order.
-
-### 5.1 Ingress Stack (Traefik + cert-manager + TLS)
-
-The ingress stack provides external routing and automatic TLS certificates:
+To deploy, apply the root application manifest:
 
 ```bash
-# Create the ingress namespace
-kubectl create namespace ingress
-
-# Deploy the ingress application (manages Traefik, cert-manager, and wildcard cert)
-kubectl apply -f k8s/argocd/apps/ingress.yaml
+kubectl apply -f k8s/argocd/app-of-apps.yaml
 ```
 
-This deploys:
-- **Traefik** — ingress controller with HTTP→HTTPS redirect (NodePorts 30080/30443)
-- **cert-manager** — automatic TLS certificate management
-- **ClusterIssuer** — Let's Encrypt production issuer
-- **Wildcard certificate** — `*.argus-infra.dev` TLS certificate
+ArgoCD will automatically detect the new application and sync it, deploying all child applications defined in `k8s/argocd/apps/`.
 
-> **Note:** Before the wildcard certificate provisions, update the domain and email placeholders in `k8s/ingress/wildcard-certificate.yaml` and `k8s/ingress/cluster-issuer.yaml` to match your actual domain.
+## 5. Running Sanity Checks
 
-### 5.2 Monitoring Stack (Prometheus + Grafana)
-
-Deploy the monitoring stack for cluster metrics and visualization:
+The repository includes a local sanity check suite to validate changes before committing. Run it from the repository root:
 
 ```bash
-# Create the monitoring namespace
-kubectl create namespace monitoring
+# Basic sanity check (Terraform validate + fmt, Ansible syntax check + lint, file structure)
+./scripts/run-sanity-checks.sh
 
-# Deploy Prometheus via the monitoring app-of-apps
-kubectl apply -f k8s/argocd/apps/monitoring.yaml
+# With verbose output
+./scripts/run-sanity-checks.sh --verbose
 
-# Deploy Grafana (dashboards and provisioning)
-kubectl apply -f k8s/argocd/apps/grafana.yaml
+# Skip ansible-lint (useful if not installed)
+./scripts/run-sanity-checks.sh --skip-ansible-lint
 ```
 
-This deploys:
-- **kube-prometheus-stack** — Prometheus, Alertmanager, node exporters, service monitors
-- **Grafana** — pre-configured with dashboards and Prometheus datasource
+The sanity suite performs:
+- **Terraform**: `init -backend=false`, `validate`, `fmt -check -recursive`, `plan` (syntax-only, no apply)
+- **Ansible**: `--syntax-check` on `site.yml` with CI inventory, `ansible-lint` on playbooks/roles
+- **File structure**: verifies all critical files exist (Terraform configs, Ansible playbooks, ArgoCD manifests)
+- **ArgoCD**: kubectl dry-run validation of manifests (if a cluster is available)
 
-### 5.3 Logging Stack (Loki + Promtail)
+### Cluster-Level Checks (with a running cluster)
 
-Deploy centralized log aggregation:
+If you have access to a running cluster, you can run additional checks:
 
 ```bash
-# Deploy Loki
-kubectl apply -f k8s/argocd/apps/loki/application.yaml
+# Full cluster sanity (nodes, pods, ArgoCD apps, ingress)
+./scripts/cluster-sanity.sh --verbose
 
-# Deploy Promtail (DaemonSet for log collection)
-kubectl apply -f k8s/argocd/apps/loki/promtail.yaml
+# ArgoCD-specific health check
+./scripts/argocd-health.sh --verbose
 ```
 
-This deploys:
-- **Loki** — log aggregation system with persistent storage
-- **Promtail** — log collection agent running on every node
+These scripts are also run automatically via GitHub Actions:
+- **Sanity Checks** — on every PR to `develop` or `main`, and on push to those branches
+- **Cluster Sanity** — every 6 hours via scheduled workflow (requires `CLUSTER_SANITY_ENABLED` repository variable)
 
-### 5.4 Verify Deployments
+## Next Steps
 
-Check that all applications are synced in ArgoCD:
-
-```bash
-argocd app list
-```
-
-Or via kubectl:
-
-```bash
-kubectl get applications -n argocd
-```
-
-Wait for all pods to be ready:
-
-```bash
-kubectl -n ingress get pods
-kubectl -n monitoring get pods
-kubectl -n traefik get pods
-kubectl -n cert-manager get pods
-```
-
-## 6. CI Workflow
-
-The repository includes a GitHub Actions workflow (`.github/workflows/sanity-checks.yml`) that runs on every PR to `develop`. It performs:
-
-- **Terraform validate** — checks configuration syntax
-- **Terraform format check** — ensures consistent formatting
-- **Terraform plan** — validates configuration with dummy variable values (no real infrastructure is provisioned)
-- **Ansible syntax check** — verifies playbook syntax using a CI-specific inventory (`inventory/homelab.ci.yml`) with dummy IPs
-- **Ansible lint** — lints all playbooks and roles for best practices
-
-> **CI implementation detail:** Ansible steps run inside a dedicated Python virtual environment (`/tmp/ansible-lint-venv`). Ansible Galaxy collections are installed using the venv's `ansible-galaxy` so that `ansible-lint` (which uses the venv's bundled `ansible-core`) can resolve modules like `community.general`. The syntax check also uses the venv's `ansible-playbook` for consistency. This avoids "couldn't resolve module/action" errors.
-> **Note:** The Terraform plan step uses dummy values for `hcloud_token`, `ssh_key_name`, `ssh_key_id`, `location`, `server_type`, and `image`. These are for syntax validation only. In a real deployment, these variables are populated from `terraform.tfvars` or CI secrets.
+After the cluster is running and ArgoCD is deployed, the platform is ready for application deployments. See the [architecture document](architecture.md) for details on how components interact.

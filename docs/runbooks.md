@@ -85,7 +85,37 @@ For applications deployed via ArgoCD, scaling is managed within Kubernetes:
 1.  **Modify Kubernetes Manifests**: Update the `replicas` count in your Deployment manifests.
 2.  **Commit and Push**: Push the updated manifests to your application's Git repository. ArgoCD will sync the changes, and Kubernetes will scale your application pods.
 
-## 4. Troubleshooting
+## 4. Running Sanity Checks
+
+The repository includes a local sanity check suite to validate infrastructure code before committing.
+
+### Local Sanity Suite
+Run from the repository root:
+```bash
+# Basic checks (Terraform, Ansible, file structure)
+./scripts/run-sanity-checks.sh
+
+# Verbose output
+./scripts/run-sanity-checks.sh --verbose
+
+# Skip ansible-lint (if not installed)
+./scripts/run-sanity-checks.sh --skip-ansible-lint
+```
+
+### Cluster-Level Checks (requires running cluster)
+```bash
+# Full cluster sanity (nodes, pods, ArgoCD apps, ingress)
+./scripts/cluster-sanity.sh --verbose
+
+# ArgoCD-specific health check
+./scripts/argocd-health.sh --verbose
+```
+
+### CI Pipeline
+- **Sanity Checks** run automatically on every PR to `develop` or `main`, and on push to those branches.
+- **Cluster Sanity** runs every 6 hours via scheduled GitHub Actions workflow (requires `CLUSTER_SANITY_ENABLED` repository variable).
+
+## 5. Troubleshooting
 
 ### General Troubleshooting Steps
 -   **Check Logs**: Review logs of relevant components (VMs, k3s, ArgoCD, application pods).
@@ -112,3 +142,9 @@ For applications deployed via ArgoCD, scaling is managed within Kubernetes:
 -   **ArgoCD Pods**: Check the status of ArgoCD pods in the `argocd` namespace.
 -   **Application Sync Status**: In the ArgoCD UI, check the sync status and health of your applications.
 -   **Resource Errors**: If an application fails to sync, check the events and logs of the problematic Kubernetes resources.
+
+### CI/CD Troubleshooting
+-   **Sanity Checks Failing**: Run `./scripts/run-sanity-checks.sh --verbose` locally to reproduce CI failures.
+-   **Cluster Sanity Failing**: Check cluster connectivity with `kubectl cluster-info`. Verify ArgoCD apps are healthy via `./scripts/argocd-health.sh --verbose`.
+-   **Workflow Not Triggering**: Ensure the workflow file is on the correct branch and the trigger conditions match your event.
+-   **Cluster Sanity Skipped**: Verify the `CLUSTER_SANITY_ENABLED` repository variable is set to `true` in GitHub repository settings.

@@ -1,6 +1,7 @@
 # Argus Infra 🚀
 
 [![Sanity Checks](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml)
+[![Cluster Sanity](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml)
 
 **A production-grade Kubernetes homelab platform on Hetzner Cloud** — provisioned with Terraform, configured with Ansible, and managed via GitOps with ArgoCD.
 
@@ -56,11 +57,17 @@ argus-infra/
 │   ├── monitoring/         # Prometheus stack
 │   ├── grafana/            # Grafana dashboards & provisioning
 │   └── cluster-issuer/     # Let's Encrypt ClusterIssuers
+├── scripts/                # Operational and CI scripts
+│   ├── run-sanity-checks.sh   # Local sanity suite (Terraform, Ansible, ArgoCD)
+│   ├── argocd-health.sh       # ArgoCD app health check
+│   └── cluster-sanity.sh      # Full cluster-level sanity checks
 ├── docs/                   # Documentation
 │   ├── architecture.md     # System architecture
 │   ├── setup.md            # Setup guide
 │   └── adr/                # Architecture Decision Records
 └── .github/workflows/      # CI pipeline
+    ├── sanity-checks.yml   # PR-level Terraform + Ansible validation
+    └── cluster-sanity.yml  # Cluster-level health checks (scheduled)
 ```
 
 ## Key Features
@@ -69,7 +76,9 @@ argus-infra/
 - **Automatic TLS** — wildcard certificate via Let's Encrypt + cert-manager
 - **Observability out of the box** — Prometheus metrics, Grafana dashboards, Loki logs
 - **Secure by default** — External Secrets Operator for secrets, private network for nodes
-- **CI-validated** — Terraform validate, Ansible lint, syntax checks on every PR
+- **CI-validated** — Terraform validate + fmt, Ansible syntax check + lint, ShellCheck, critical file checks on every PR
+- **Cluster health monitoring** — scheduled cluster sanity checks (nodes, pods, ArgoCD apps, ingress) every 6 hours
+- **Local sanity suite** — run `./scripts/run-sanity-checks.sh` before committing to catch issues early
 
 ## Architecture
 
