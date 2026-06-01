@@ -19,7 +19,7 @@ Ensure the `KUBECONFIG` environment variable is set if your kubeconfig file is n
 
 2.  **Bootstrap ArgoCD**
 
-    Run the following commands to bootstrap ArgoCD to install ArgoCD and set up the root app-of-apps.
+    Apply the following commands to install ArgoCD and set up the root app-of-apps.
 
     Applying ArgoCD install manifests...
     ```bash
