@@ -1,6 +1,6 @@
 # Argus Infra 🚀
 
-[![Sanity Checks](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml)
+[![Sanity Checks](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml/badge.svg) [Cluster Sanity](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml)
 
 **A production-grade Kubernetes homelab platform on Hetzner Cloud** — provisioned with Terraform, configured with Ansible, and managed via GitOps with ArgoCD.
 
@@ -69,7 +69,7 @@ argus-infra/
 - **Automatic TLS** — wildcard certificate via Let's Encrypt + cert-manager
 - **Observability out of the box** — Prometheus metrics, Grafana dashboards, Loki logs
 - **Secure by default** — External Secrets Operator for secrets, private network for nodes
-- **CI-validated** — Terraform validate, Ansible lint, syntax checks on every PR
+- **CI-validated: Includes Terraform validation, Ansible linting, and comprehensive cluster sanity checks.** — Terraform validate, Ansible lint, syntax checks on every PR
 
 ## Architecture
 
