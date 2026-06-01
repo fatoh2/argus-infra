@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euo pipefail
+# This script includes basic error handling with set -euo pipefail and error_exit function.
 
 log() {
   echo "--- $(date '+%Y-%m-%d %H:%M:%S') --- $1"
@@ -19,6 +20,9 @@ log "ArgoCD CLI v${ARGOCD_VERSION} installed."
 log "Installing ArgoCD into Kubernetes"
 kubectl create namespace argocd || log "Namespace argocd already exists, continuing."
 kubectl apply -n argocd -f k8s/argocd/install.yaml || error_exit "Failed to apply ArgoCD install manifests"
+log "Applying ArgoCD configuration"
+kubectl apply -n argocd -f k8s/argocd/config/argocd-rbac-cm.yaml || error_exit "Failed to apply ArgoCD RBAC config"
+kubectl apply -n argocd -f k8s/argocd/config/argocd-cm.yaml || error_exit "Failed to apply ArgoCD general config"
 
 log "Waiting for ArgoCD server to be ready"
 kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=300s || error_exit "ArgoCD server did not become ready within timeout"

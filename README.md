@@ -55,9 +55,9 @@ This repository uses Infrastructure as Code (IaC) principles to provision and ma
 To deploy a full Argus Infra cluster, please refer to the [Setup Guide](docs/setup.md).
 
 ## Further Documentation
+-   [Full Infra Architecture](docs/architecture.md): In-depth explanation of the infrastructure components and their interactions.
 
 -   [Setup Guide](docs/setup.md): Detailed instructions for setting up the infrastructure.
--   [Architecture Deep Dive](docs/architecture.md): In-depth explanation of the infrastructure components and their interactions.
 -   [Operational Runbooks](docs/runbooks.md): Guides for common operational tasks like deployment, rollback, and troubleshooting.
 -   [Architecture Decision Records (ADRs)](docs/adr/): Documentation of key architectural decisions.
 

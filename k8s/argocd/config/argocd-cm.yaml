@@ -5,6 +5,24 @@ metadata:
   namespace: argocd
 data:
   # Disable anonymous access
-  users.anonymous.enabled: "false"
-  # Configure a custom login banner (optional)
-  ui.banner: "Welcome to Argus ArgoCD. Unauthorized access is prohibited."
+  oidc.config: |
+    {
+      "name": "Argocd",
+      "issuer": "https://accounts.google.com",
+      "clientID": "{{.sso.clientID}}",
+      "clientSecret": "{{.sso.clientSecret}}",
+      "requestedScopes": ["email", "profile", "groups"]
+    }
+  # Enable server-side logging
+  server.log.level: "info"
+  # Enable server-side logging format
+  server.log.format: "text"
+  # Enable UI settings
+  ui.workflows.enabled: "true"
+  ui.checksum.enabled: "true"
+  ui.notifications.enabled: "true"
+  # Enable SSO configuration (example, needs actual values)
+  # sso.provider: "google"
+  # sso.clientID: "YOUR_CLIENT_ID"
+  # sso.clientSecret: "YOUR_CLIENT_SECRET"
+  # sso.hostedDomains: "example.com"
