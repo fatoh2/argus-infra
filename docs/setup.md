@@ -5,23 +5,11 @@ This document outlines the steps to set up ArgoCD on the Kubernetes cluster usin
 ## Prerequisites
 
 - A running Kubernetes cluster (e.g., provisioned by Terraform and Ansible).
-- kubectl controls the Kubernetes cluster manager.
+- kubectl access to the Kubernetes cluster.
 
  Find more information at: https://kubernetes.io/docs/reference/kubectl/
 
-  api-resources   Print the supported API resources on the server
-  api-versions    Print the supported API versions on the server, in the form of "group/version"
-  config          Modify kubeconfig files
-  kuberc          Manage kuberc configuration files
-  plugin          Provides utilities for interacting with plugins
-  version         Print the client and server version information
-
-Usage:
-  kubectl [flags] [options]
-
-Use "kubectl <command> --help" for more information about a given command.
-Use "kubectl options" for a list of global command-line options (applies to all commands). configured to connect to your cluster.
--  environment variable set if your kubeconfig is not at .
+If your kubeconfig is not at the default location, ensure the KUBECONFIG environment variable is set.
 
 ## Steps
 
@@ -52,7 +40,7 @@ Use "kubectl options" for a list of global command-line options (applies to all 
 
     Port-forward the ArgoCD server to access the UI:
     ```bash
-    kubectl port-forward svc/argocd-server -n argocd 8080:443
+    kubectl port-forward svc/argocd-server -n argocd 8080:80 # Assuming HTTP on port 80. Adjust if using HTTPS on 443.
     ```
 
 
@@ -61,5 +49,5 @@ Use "kubectl options" for a list of global command-line options (applies to all 
 
 ## Next Steps
 
-- Add child application manifests to `argocd/apps` for your specific workloads (e.g., monitoring, databases, ingress, security).
+- Review and customize the existing child application manifests in `k8s/argocd/apps` and add any additional ones for your specific workloads (e.g., monitoring, databases, ingress, security).
 - Commit these changes to the `develop` branch of the `argus-infra` repository. ArgoCD will automatically sync them.
