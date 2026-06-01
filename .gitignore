@@ -10,3 +10,4 @@ kubeconfig.yaml
 *.pem
 *.key
 ansible/inventory/hosts
+ansible/inventory/homelab.yml
