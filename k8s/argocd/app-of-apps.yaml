@@ -11,7 +11,7 @@ spec:
   source:
     path: k8s/argocd/apps
     repoURL: https://github.com/fatoh2/argus-infra # NOTE: Hardcoded for initial setup. Consider templating for advanced use cases.
-    targetRevision: main # NOTE: Ensure robust CI/CD practices for the main branch as changes will be automatically synced.
+    targetRevision: HEAD # NOTE: Ensure robust CI/CD practices for the main branch as changes will be automatically synced.
   syncPolicy:
     automated:
       prune: true
