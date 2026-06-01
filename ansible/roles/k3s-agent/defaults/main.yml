@@ -1,0 +1,6 @@
+---
+# URL for the k3s installation script
+k3s_install_url: "https://get.k3s.io"
+
+# K3s version to install. Empty string means latest stable.
+k3s_version: ""
