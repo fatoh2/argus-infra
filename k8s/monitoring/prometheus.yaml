@@ -1,0 +1,38 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: kube-prometheus-stack
+  namespace: monitoring
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: kube-prometheus-stack
+      version: "45.x.x" # Use a specific version, check latest stable
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-community
+        namespace: flux-system
+  install:
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      retries: -1
+  values:
+    prometheus:
+      prometheusSpec:
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: standard # Assuming 'standard' storage class exists
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 50Gi # Adjust as needed
+        serviceMonitorSelectorNilUsesPods: false
+        podMonitorSelectorNilUsesPods: false
+        probeSelectorNilUsesPods: false
+        ruleSelectorNilUsesPods: false
+        scrapeInterval: 30s
+        evaluationInterval: 30s

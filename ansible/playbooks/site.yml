@@ -1,0 +1,29 @@
+---
+# site.yml — Master orchestration playbook for the Argus homelab cluster
+#
+# Host groups (defined in inventory):
+#   k3s_cluster  — all nodes (control + workers)
+#   k3s_server   — control-plane node  (k8s-control)
+#   k3s_agent    — worker nodes        (k8s-worker-1, k8s-worker-2)
+
+- name: Apply common configuration to all cluster nodes
+  hosts: k3s_cluster
+  gather_facts: true
+  become: true
+  roles:
+    - role: common
+
+- name: Install and configure k3s server (control plane)
+  hosts: k3s_server
+  gather_facts: true
+  become: true
+  serial: 1
+  roles:
+    - role: k3s-server
+
+- name: Install and configure k3s agents (worker nodes)
+  hosts: k3s_agent
+  gather_facts: true
+  become: true
+  roles:
+    - role: k3s-agent

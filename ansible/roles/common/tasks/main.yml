@@ -1,0 +1,64 @@
+---
+- name: Set system timezone to UTC
+  community.general.timezone:
+    name: "{{ common_timezone }}"
+
+- name: Install base packages
+  ansible.builtin.package:
+    name: "{{ common_packages }}"
+    state: present
+
+# --- SSH hardening ---
+# NOTE: Firewall rules are managed by Terraform / require PM escalation per
+# CLAUDE.md, so they are intentionally NOT configured here. Key-based auth is
+# preserved; only password and challenge-response auth are disabled.
+- name: Harden SSH (disable password auth, keep key auth)
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/10-argus-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (argus-infra common role)
+      PasswordAuthentication no
+      ChallengeResponseAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin prohibit-password
+  notify: Restart sshd
+
+# --- Kernel prerequisites for k3s/Kubernetes ---
+- name: Disable swap at runtime
+  ansible.builtin.command: swapoff -a
+  when: ansible_swaptotal_mb is defined and ansible_swaptotal_mb > 0
+  changed_when: ansible_swaptotal_mb is defined and ansible_swaptotal_mb > 0
+
+- name: Remove swap entries from /etc/fstab
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\sswap\s.*)$'
+    replace: '# \1'
+
+- name: Load br_netfilter kernel module
+  community.general.modprobe:
+    name: br_netfilter
+    state: present
+
+- name: Persist br_netfilter module load
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k3s.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: "br_netfilter\n"
+
+- name: Apply sysctl settings required by k3s
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/99-k3s.conf
+    state: present
+    reload: true
+  loop:
+    - { name: net.bridge.bridge-nf-call-iptables, value: "1" }
+    - { name: net.bridge.bridge-nf-call-ip6tables, value: "1" }
+    - { name: net.ipv4.ip_forward, value: "1" }
