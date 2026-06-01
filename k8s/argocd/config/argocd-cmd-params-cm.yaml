@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cmd-params-cm
+  namespace: argocd
+data:
+  # Disable client-side TLS renegotiation (security hardening)
+  server.insecure: "false"
+  # Set a longer timeout for repository operations (optional, adjust as needed)
+  repo.server.timeout.seconds: "600"
