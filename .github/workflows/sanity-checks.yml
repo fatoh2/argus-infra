@@ -4,6 +4,11 @@ on:
   pull_request:
     branches:
       - develop
+      - main
+  push:
+    branches:
+      - develop
+      - main
 
 env:
   ANSIBLE_CONFIG: ansible/ansible.cfg
@@ -13,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.5.7
 
@@ -29,7 +34,7 @@ jobs:
       - name: Terraform Format Check
         run: |
           cd terraform/environments/homelab
-          terraform fmt -check
+          terraform fmt -check -recursive
 
       - name: Terraform Plan (no apply)
         run: |
@@ -50,40 +55,62 @@ jobs:
             -var="server_type=cx22" \
             -var="image=ubuntu-24.04"
 
-      - name: Setup Python virtual environment for Ansible Lint
+      - name: Setup Python virtual environment for Ansible
         run: |
-          python3 -m venv /tmp/ansible-lint-venv
-          /tmp/ansible-lint-venv/bin/pip install ansible-lint
+          python3 -m venv /tmp/ansible-venv
+          /tmp/ansible-venv/bin/pip install ansible-lint
 
-      - name: Install Ansible Galaxy Collections (inside venv)
+      - name: Install Ansible Galaxy Collections
         run: |
-          # Install collections inside the venv so ansible-lint (which uses the
-          # venv's bundled ansible-core) can resolve modules like community.general.
-          /tmp/ansible-lint-venv/bin/ansible-galaxy collection install -r ansible/requirements.yml
+          /tmp/ansible-venv/bin/ansible-galaxy collection install -r ansible/requirements.yml
 
       - name: Ansible Syntax Check
         run: |
-          # Use homelab.ci.yml (CI-specific inventory with dummy IPs) instead of
-          # homelab.yml (template with placeholders) to avoid parse failures.
-          /tmp/ansible-lint-venv/bin/ansible-playbook --syntax-check \
+          /tmp/ansible-venv/bin/ansible-playbook --syntax-check \
             -i ansible/inventory/homelab.ci.yml ansible/playbooks/site.yml
 
       - name: Ansible Lint
         run: |
-          # Lint all playbooks and roles for comprehensive coverage.
-          /tmp/ansible-lint-venv/bin/ansible-lint ansible/playbooks/ ansible/roles/
+          /tmp/ansible-venv/bin/ansible-lint ansible/playbooks/ ansible/roles/
 
-      # ArgoCD app health check, cluster sanity, and ingress reachability are not feasible
-      # in a standard PR check without a dedicated test cluster.
-      # These steps are commented out to prevent CI failures in environments without a running cluster.
-      # If these checks are critical, they should be part of a separate CI job that provisions
-      # a temporary cluster.
+      - name: Script Syntax Check (ShellCheck)
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: ./scripts
+          severity: warning
+        continue-on-error: true  # ShellCheck is advisory for now
 
-      # - name: ArgoCD App Health Check (Placeholder)
-      #   run: echo "ArgoCD app health check requires a running cluster and ArgoCD CLI access."
+      - name: Check Critical Files Exist
+        run: |
+          MISSING=0
+          for file in \
+            terraform/environments/homelab/main.tf \
+            terraform/environments/homelab/variables.tf \
+            terraform/environments/homelab/outputs.tf \
+            ansible/playbooks/site.yml \
+            ansible/inventory/homelab.ci.yml \
+            ansible/inventory/homelab.yml.example \
+            ansible/requirements.yml \
+            k8s/argocd/app-of-apps.yaml \
+            k8s/argocd/install.yaml \
+            scripts/cluster-sanity.sh \
+            scripts/bootstrap-argocd.sh \
+            CLAUDE.md \
+            README.md; do
+            if [ ! -f "$file" ]; then
+              echo "❌ Missing: $file"
+              MISSING=$((MISSING + 1))
+            else
+              echo "✅ Found: $file"
+            fi
+          done
+          if [ "$MISSING" -ne 0 ]; then
+            echo "::error::$MISSING critical file(s) missing"
+            exit 1
+          fi
+          echo "All critical files present."
 
-      # - name: Cluster Sanity Check (Placeholder)
-      #   run: echo "Cluster sanity check requires kubectl access to a running cluster."
-
-      # - name: Ingress Reachability Test (Placeholder)
-      #   run: echo "Ingress reachability test requires a running cluster with ingress and network access."
+      # ArgoCD app health check, cluster sanity, and ingress reachability
+      # require a live cluster. These are covered by the cluster-sanity.yml
+      # workflow (manual trigger + scheduled every 6 hours).
+      # See: .github/workflows/cluster-sanity.yml
