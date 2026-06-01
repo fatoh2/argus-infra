@@ -20,7 +20,7 @@ jobs:
       - name: Terraform Validate
         run: |
           cd terraform/environments/homelab
-          terraform init
+          terraform init -backend=false
           terraform validate
 
       - name: Terraform Format Check
@@ -31,27 +31,41 @@ jobs:
       - name: Terraform Plan (no apply)
         run: |
           cd terraform/environments/homelab
-          terraform plan -no-color
+          # Initialize without backend to avoid needing cloud credentials in CI.
+          # Plan with dummy variable values to validate configuration syntax.
+          # In a real run, these would come from terraform.tfvars (gitignored) or CI secrets.
+          terraform init -backend=false -input=false
+          terraform plan -no-color -input=false \
+            -var="hcloud_token=ci-dummy-token" \
+            -var="ssh_key_name=ci-dummy-key" \
+            -var="location=nbg1" \
+            -var="server_type=cx22" \
+            -var="image=ubuntu-24.04"
+
+      - name: Setup Python virtual environment for Ansible Lint
+        run: |
+          python3 -m venv /tmp/ansible-lint-venv
+          /tmp/ansible-lint-venv/bin/pip install ansible-lint
 
       - name: Ansible Syntax Check
         run: |
-          cd ansible
-          ansible-playbook --syntax-check playbooks/site.yml
+          ansible-playbook --syntax-check -i ansible/inventory/homelab.yml ansible/playbooks/site.yml
 
       - name: Ansible Lint
         run: |
-          pip install ansible-lint
-          ansible-lint ansible/playbooks/site.yml
+          /tmp/ansible-lint-venv/bin/ansible-lint ansible/playbooks/site.yml
 
-      # ArgoCD app health check, cluster sanity, and ingress reachability will require a running cluster.
-      # These steps are currently placeholders and will be implemented in a future iteration once a CI/test cluster is available.
-      # This will likely involve setting up a k3s cluster in CI or connecting to a temporary test cluster.
+      # ArgoCD app health check, cluster sanity, and ingress reachability are not feasible
+      # in a standard PR check without a dedicated test cluster.
+      # These steps are commented out to prevent CI failures in environments without a running cluster.
+      # If these checks are critical, they should be part of a separate CI job that provisions
+      # a temporary cluster.
 
-      - name: ArgoCD App Health Check (Placeholder)
-        run: echo "ArgoCD app health check requires a running cluster and ArgoCD CLI access."
+      # - name: ArgoCD App Health Check (Placeholder)
+      #   run: echo "ArgoCD app health check requires a running cluster and ArgoCD CLI access."
 
-      - name: Cluster Sanity Check (Placeholder)
-        run: echo "Cluster sanity check requires kubectl access to a running cluster."
+      # - name: Cluster Sanity Check (Placeholder)
+      #   run: echo "Cluster sanity check requires kubectl access to a running cluster."
 
-      - name: Ingress Reachability Test (Placeholder)
-        run: echo "Ingress reachability test requires a running cluster with ingress and network access."
+      # - name: Ingress Reachability Test (Placeholder)
+      #   run: echo "Ingress reachability test requires a running cluster with ingress and network access."
