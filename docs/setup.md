@@ -240,4 +240,6 @@ The repository includes a GitHub Actions workflow (`.github/workflows/sanity-che
 - **Ansible syntax check** — verifies playbook syntax using a CI-specific inventory (`inventory/homelab.ci.yml`) with dummy IPs
 - **Ansible lint** — lints all playbooks and roles for best practices
 
+> **CI implementation detail:** Ansible steps run inside a dedicated Python virtual environment (`/tmp/ansible-lint-venv`). Ansible Galaxy collections are installed using the venv's `ansible-galaxy` so that `ansible-lint` (which uses the venv's bundled `ansible-core`) can resolve modules like `community.general`. The syntax check also uses the venv's `ansible-playbook` for consistency. This avoids "couldn't resolve module/action" errors.
+
 > **Note:** The Terraform plan step uses dummy values for `hcloud_token`, `ssh_key_name`, `ssh_key_id`, `location`, `server_type`, and `image`. These are for syntax validation only. In a real deployment, these variables are populated from `terraform.tfvars` or CI secrets.
