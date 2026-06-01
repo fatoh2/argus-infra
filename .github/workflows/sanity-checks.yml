@@ -78,7 +78,6 @@ jobs:
         with:
           scandir: ./scripts
           severity: warning
-        continue-on-error: true  # ShellCheck is advisory for now
 
       - name: Check Critical Files Exist
         run: |

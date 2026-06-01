@@ -1,9 +1,6 @@
 name: Cluster Sanity
 
 on:
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       skip_argocd:
@@ -20,13 +17,20 @@ on:
     # Run every 6 hours: at minute 0 past every 6th hour.
     - cron: '0 */6 * * *'
 
+env:
+  # Set to 'true' in repository variables to enable cluster sanity checks.
+  # This avoids using secrets in job-level if conditions, which are not
+  # available for pull_request events from forks.
+  CLUSTER_SANITY_ENABLED: ${{ vars.CLUSTER_SANITY_ENABLED || 'false' }}
+
 jobs:
   cluster-sanity:
     runs-on: ubuntu-latest
-    # Only run if cluster access secrets are configured.
+    # Only run if the repository variable CLUSTER_SANITY_ENABLED is set to 'true'.
     # This prevents the workflow from failing in forks or PRs without cluster access.
-    if: secrets.KUBECONFIG != ''
-    
+    # Repository variables ARE accessible in if: conditions (unlike secrets).
+    if: env.CLUSTER_SANITY_ENABLED == 'true'
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -37,10 +41,16 @@ jobs:
           version: 'v1.30.0'
 
       - name: Configure cluster access
+        env:
+          KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG }}
         run: |
-          mkdir -p ~/.kube
-          echo "${{ secrets.KUBECONFIG }}" > ~/.kube/config
-          chmod 600 ~/.kube/config
+          # Write kubeconfig from secret to a temp file, then use KUBECONFIG env var
+          # to point kubectl at it. This avoids echoing the secret content into a file
+          # which could leak in debug output.
+          KUBECONFIG_FILE=$(mktemp /tmp/kubeconfig.XXXXXX)
+          echo "$KUBECONFIG_CONTENT" > "$KUBECONFIG_FILE"
+          chmod 600 "$KUBECONFIG_FILE"
+          echo "KUBECONFIG=$KUBECONFIG_FILE" >> "$GITHUB_ENV"
           kubectl config set-context --current --namespace=argocd 2>/dev/null || true
 
       - name: Verify cluster connectivity
