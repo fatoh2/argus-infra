@@ -27,42 +27,12 @@ This repository uses Infrastructure as Code (IaC) principles to provision and ma
 -   **TLS:** cert-manager
 -   **Monitoring:** Prometheus, Grafana (future)
 
-## Architecture Diagram (Conceptual)
 
-```
-+---------------------+       +---------------------+       +---------------------+
-| Hetzner Cloud       |       | GitHub              |       | External Services   |
-|                     |       | (argus-infra repo)  |       |                     |
-| +-----------------+ |       |                     |       | +---------------+   |
-| | Private Network | |       | +-----------------+ |       | | Doppler       |   |
-| | 10.0.1.0/24     | |       | | GitOps Repo     | |       | +-------^-------+   |
-| |                 | |       | | (k8s manifests) | |       |         |           |
-| | +-------------+ | |       | +--------^--------+ |       |         | ESO       |
-| | | k8s-control |<----+-----+----------|-----------+-------+---------+           |
-| | | (k3s server)| | |       |          | ArgoCD    |       |                     |
-| | +-------------+ | |       |          | Sync      |       | +---------------+   |
-| |       |         | |       |          v          |       | | DNS Provider  |   |
-| | +-------------+ | |       | +-----------------+ |       | +-------^-------+   |
-| | | k8s-worker-1|<----+-----+ | ArgoCD          | |       |         | External  |
-| | | (k3s agent) | | |       | | (running in k8s)| |       |         | DNS       |
-| | +-------------+ | |       | +-----------------+ |       |         |           |
-| |       |         | |       |                     |       | +---------------+   |
-| | +-------------+ | |       |                     |       | | Let's Encrypt |   |
-| | | k8s-worker-2|<----+---------------------------+-------+ +-------^-------+   |
-| | | (k3s agent) | | |                                       |         | cert-mgr  |
-| | +-----------------+ |                                       +---------------------+
-+---------------------+
-```
-
-
-
-## Getting Started
-
-To deploy a full Argus Infra cluster, please refer to the [Setup Guide](docs/setup.md). This guide will walk you through the prerequisites, Terraform provisioning, Ansible configuration, and ArgoCD bootstrapping.
+For detailed setup instructions, refer to the [Setup Guide](docs/setup.md).
 
 ## Further Documentation
 
--   [Full Infra Architecture](docs/architecture.md): In-depth explanation of the infrastructure components and their interactions, including networking, Kubernetes internals, and GitOps flow.
+-   [Full Infra Architecture](docs/architecture.md): In-depth explanation of the infrastructure components and their interactions, including networking, Kubernetes internals, and GitOps flow. This document contains a detailed architecture diagram.
 -   [Setup Guide](docs/setup.md): Detailed instructions for setting up the infrastructure from scratch.
 -   [Operational Runbooks](docs/runbooks.md): Guides for common operational tasks like deployment, rollback, scaling, and troubleshooting.
 -   [Architecture Decision Records (ADRs)](docs/adr/): Documentation of key architectural decisions made during the project.
