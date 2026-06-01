@@ -5,76 +5,54 @@ This document outlines the steps to set up ArgoCD on the Kubernetes cluster usin
 ## Prerequisites
 
 - A running Kubernetes cluster (e.g., provisioned by Terraform and Ansible).
-- kubectl controls the Kubernetes cluster manager.
-
-
+- `kubectl` configured to control your Kubernetes cluster.
 
 ## Steps
 
-1.  **Provision VMs and Install k3s (if not already done)**
+1.  **Provision VMs and Install k3s**
 
-    Refer to the Usage: terraform [global options] <subcommand> [args]
+    If you haven't already, provision your virtual machines using Terraform and install k3s using Ansible.
+    Refer to the `terraform/` and `ansible/` directories for detailed instructions.
 
-The available commands for execution are listed below.
-The primary workflow commands are given first, followed by
-less common or more advanced commands.
+    Example (from the `terraform/` directory):
+    ```bash
+    terraform init
+    terraform apply
+    ```
 
-Main commands:
-  init          Prepare your working directory for other commands
-  validate      Check whether the configuration is valid
-  plan          Show changes required by the current configuration
-  apply         Create or update infrastructure
-  destroy       Destroy previously-created infrastructure
-
-All other commands:
-  console       Try Terraform expressions at an interactive command prompt
-  fmt           Reformat your configuration in the standard style
-  force-unlock  Release a stuck lock on the current workspace
-  get           Install or upgrade remote Terraform modules
-  graph         Generate a Graphviz graph of the steps in an operation
-  import        Associate existing infrastructure with a Terraform resource
-  login         Obtain and save credentials for a remote host
-  logout        Remove locally-stored credentials for a remote host
-  metadata      Metadata related commands
-  modules       Show all declared modules in a working directory
-  output        Show output values from your root module
-  providers     Show the providers required for this configuration
-  query         Search and list remote infrastructure with Terraform
-  refresh       Update the state to match remote systems
-  show          Show the current state or a saved plan
-  stacks        Manage HCP Terraform stack operations
-  state         Advanced state management
-  taint         Mark a resource instance as not fully functional
-  test          Execute integration tests for Terraform modules
-  untaint       Remove the 'tainted' state from a resource instance
-  version       Show the current Terraform version
-  workspace     Workspace management
-
-Global options (use these before the subcommand, if any):
-  -chdir=DIR    Switch to a different working directory before executing the
-                given subcommand.
-  -help         Show this help output or the help for a specified subcommand.
-  -version      An alias for the "version" subcommand. and  directories for instructions on provisioning VMs and installing k3s.
+    Example (from the `ansible/` directory, after updating `inventory/homelab.yml`):
+    ```bash
+    ansible-playbook -i inventory/homelab.yml playbooks/k3s-cluster.yml
+    ```
 
 2.  **Bootstrap ArgoCD**
 
     Run the bootstrap script to install ArgoCD and set up the root app-of-apps.
+    This will apply the necessary manifests to your Kubernetes cluster.
 
-    Applying ArgoCD install manifests...
-    
+    ```bash
+    ./scripts/bootstrap-argocd.sh
+    ```
 
 3.  **Retrieve ArgoCD Admin Password**
 
-    
+    The initial admin password for ArgoCD is stored in a Kubernetes secret. Retrieve it using the following command:
+
+    ```bash
+    kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+    ```
 
 4.  **Access ArgoCD UI**
 
-    
-    Then navigate to https://localhost:8080 in your browser. The username is .
+    Port-forward the ArgoCD UI service to your local machine to access it via your browser.
 
+    ```bash
+    kubectl port-forward svc/argocd-server -n argocd 8080:443
+    ```
+    Then navigate to `https://localhost:8080` in your browser. The default username is `admin`.
 
 ## Next Steps
 
-- Add child application manifests to  for your specific workloads (e.g., monitoring, databases, ingress, security).
-- Commit these changes to the  branch of the  repository. ArgoCD will automatically sync them.
-- For example, to add the  application, you would create a file like  and commit it.
+- Add child application manifests to the `argocd/apps/` directory for your specific workloads (e.g., monitoring, databases, ingress, security).
+- Commit these changes to the `develop` branch of the `argus-infra` repository. ArgoCD will automatically sync them.
+- For example, to add the `prometheus` application, you would create a file like `argocd/apps/prometheus.yaml` and commit it.
