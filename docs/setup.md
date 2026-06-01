@@ -10,8 +10,9 @@ Before you begin, ensure you have the following installed on your local machine:
 - **Terraform** (v1.0.0+) — for provisioning Hetzner Cloud VMs
 - **Ansible** (v2.10+) — for configuring the k3s cluster
 - **kubectl** — for interacting with the Kubernetes cluster
-- **ArgoCD CLI** — for managing GitOps deployments
 - **Hetzner Cloud API Token** — create one in your Hetzner Cloud project under **Security > API Tokens**
+
+> **ArgoCD CLI** is optional. It is only needed if you prefer CLI-based management of ArgoCD applications over the Web UI or `kubectl`. Installation instructions are provided in the ArgoCD section below.
 
 ## 1. Clone the Repository
 
@@ -105,6 +106,7 @@ Edit `inventory/homelab.yml` with the actual IP addresses from Terraform's outpu
 all:
   vars:
     ansible_user: root
+    ansible_ssh_private_key_file: ~/.ssh/argus_homelab
     k3s_version: ""
   children:
     k3s_server:
@@ -122,6 +124,8 @@ all:
         k3s_server:
         k3s_agent:
 ```
+
+> **CI note:** The repository includes `inventory/homelab.ci.yml` with dummy IPs (RFC 5737 TEST-NET range) for use in CI syntax checks. This file is not used for actual deployments.
 
 ### Run Playbook
 
@@ -206,7 +210,7 @@ Log in to the ArgoCD UI or CLI with:
 - **Username:** `admin`
 - **Password:** (the output of the command above)
 
-For CLI login:
+For CLI login (requires ArgoCD CLI — optional, only needed if you prefer CLI over the Web UI):
 
 ```bash
 argocd login localhost:8080 --username admin --password $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
@@ -217,43 +221,23 @@ argocd login localhost:8080 --username admin --password $(kubectl -n argocd get 
 ArgoCD applications are defined in the `argocd/apps/` directory. To deploy them, either:
 
 1. **Via the ArgoCD UI:** Click "New App" and configure the source pointing to this repository.
-2. **Via the ArgoCD CLI:**
+2. **Via the ArgoCD CLI (requires ArgoCD CLI installed):**
    ```bash
    argocd app create <app-name> --repo https://github.com/fatoh2/argus-infra.git --path argocd/apps/<app-name> --dest-server https://kubernetes.default.svc --dest-namespace <namespace>
    ```
 3. **Via kubectl:** Apply the Application manifests directly:
    ```bash
-   kubectl apply -f argocd/apps/
+   kubectl apply -f argocd/apps/<app-name>/application.yaml
    ```
 
-## Development
+## 5. CI Workflow
 
-### Running Sanity Checks Locally
+The repository includes a GitHub Actions workflow (`.github/workflows/sanity-checks.yml`) that runs on every PR to `develop`. It performs:
 
-To ensure your changes are valid before pushing, run the same checks as CI:
+- **Terraform validate** — checks configuration syntax
+- **Terraform format check** — ensures consistent formatting
+- **Terraform plan** — validates configuration with dummy variable values (no real infrastructure is provisioned)
+- **Ansible syntax check** — verifies playbook syntax using a CI-specific inventory (`inventory/homelab.ci.yml`) with dummy IPs
+- **Ansible lint** — lints all playbooks and roles for best practices
 
-```bash
-# Terraform validation
-cd terraform/environments/homelab
-terraform init -backend=false
-terraform validate
-terraform fmt -check
-
-# Ansible syntax check
-cd ../../ansible
-ansible-playbook --syntax-check -i inventory/homelab.yml playbooks/site.yml
-
-# Ansible lint (requires ansible-lint)
-pip install ansible-lint
-ansible-lint playbooks/site.yml
-```
-
-You can also use [act](https://github.com/nektos/act) to run the GitHub Actions workflow locally (requires Docker):
-
-```bash
-act -j sanity-checks
-```
-
-### Contributing
-
-Please follow the [CONTRIBUTING.md](CONTRIBUTING.md) guidelines.
+> **Note:** The Terraform plan step uses dummy values for `hcloud_token`, `ssh_key_name`, `ssh_key_id`, `location`, `server_type`, and `image`. These are for syntax validation only. In a real deployment, these variables are populated from `terraform.tfvars` or CI secrets.
