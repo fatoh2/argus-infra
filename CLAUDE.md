@@ -1,70 +1,29 @@
-# argus-infra — Infrastructure Agent Rules
+# Argus Infra - CLAUDE.md
 
-## Role
-You manage the Argus Platform: Kubernetes homelab provisioned with Terraform/OpenTofu,
-configured with Ansible, and operated via ArgoCD GitOps.
+This document outlines the architectural principles, repository structure, and non-negotiable rules for the `argus-infra` repository.
 
-## Stack
-- **Provisioning**: Terraform/OpenTofu + Hetzner Cloud provider
-- **Configuration**: Ansible
-- **Orchestration**: Kubernetes via **k3s** (not kubeadm — k3s is lighter, single binary, same K8s API)
-- **GitOps**: ArgoCD (argocd-root app-of-apps pattern)
-- **Ingress**: NGINX + cert-manager (Let's Encrypt)
-- **Secrets**: External Secrets Operator + Doppler
-- **Monitoring**: Prometheus + Grafana + Loki
-- **Database**: PostgreSQL + pgbackrest → Backblaze B2
-- **Queue**: Redis
-- **Package manager**: Helm
+## Architectural Principles
+
+- **Infrastructure as Code (IaC):** All infrastructure is defined and managed through code (Terraform, Ansible).
+- **GitOps:** Kubernetes cluster state is managed declaratively through Git (ArgoCD).
+- **Observability:** Comprehensive monitoring and logging are built-in (Prometheus, Grafana, Loki).
+- **Security First:** Secure defaults and practices are enforced.
+- **Modularity:** Components are designed to be independent and reusable.
 
 ## Repo Structure
-- `terraform/`: Terraform/OpenTofu configurations for provisioning infrastructure.
-- `ansible/`: Ansible playbooks and roles for configuring Kubernetes and other services.
-- `kubernetes/`: Kubernetes manifests and Helm charts for deploying applications via ArgoCD.
-- `docs/`: Documentation for setup, operations, and architecture.
-- `helm/base-app/`: Shared chart template all apps extend
-- `scripts/`: Utility scripts for bootstrapping and operations
+
+- `terraform/`: Terraform configurations for provisioning infrastructure (e.g., Hetzner VMs).
+- `ansible/`: Ansible playbooks and roles for configuring VMs and installing k3s.
+- `kubernetes/`: Git submodule for `argus-infra-kubernetes` containing ArgoCD applications, Kubernetes manifests, and Helm charts. This directory now houses the content previously found in `argocd/` and `monitoring/` within the submodule.
+- `docs/`: Project documentation, including setup guides and architectural decisions.
 
 ## Non-Negotiable Rules
-- **NEVER** run `terraform destroy` without explicit user confirmation in Telegram.
-- **NEVER** use `kubectl delete` on `argus-prod` namespace without explicit user confirmation.
-- **NEVER** commit secrets, tokens, `.env` files, or kubeconfig files.
-- **NEVER** push directly to `main` or `develop` — always open a PR.
-- **NEVER** change firewall rules or Doppler secrets without user escalation.
-- **ALWAYS** add `resources.requests` AND `resources.limits` to every pod spec.
-- **ALWAYS** run `terraform plan` and include the full diff in your PR description.
-- **ALWAYS** run `helm lint` before committing chart changes.
-- **ALWAYS** update `docs/setup.md` when adding or changing operational procedures.
 
-## PR Format
-```
-Title: [infra] short description
-
-Body:
-## What changed
-<why this change was needed>
-
-## Terraform plan output
-<paste terraform plan diff here>
-
-## Risks
-<what could go wrong>
-
-## Rollback
-<how to revert if something breaks>
-
-## Checklist
-- [ ] helm lint passed
-- [ ] terraform plan reviewed
-- [ ] No secrets in diff
-- [ ] Runbook updated (if applicable)
-- [ ] Resource limits set on all new pods
-```
-
-## Escalate to PM when
-- Any change to firewall rules or network policies
-- Any new secret being added to Doppler
-- Any change affecting `argus-prod` namespace
-- Terraform state conflicts
-- Node failure or cluster health issues
-
-For detailed setup instructions, refer to `docs/setup.md`.
+- **ALWAYS use Terraform for infrastructure provisioning.** No manual changes to cloud resources.
+- **ALWAYS use Ansible for VM configuration and k3s installation.**
+- **ALWAYS use ArgoCD for deploying applications to Kubernetes.** Direct `kubectl apply` is forbidden for production deployments.
+- **ALWAYS update `docs/setup.md`** when operational procedures or setup instructions change.
+- **NEVER commit secrets to Git.** Use a secrets management solution (e.g., SOPS, Vault).
+- **ALL changes must go through a Pull Request (PR) review process.**
+- **Tests must pass before merging to `develop`.**
+- **Follow conventional commit messages.**

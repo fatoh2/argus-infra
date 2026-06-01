@@ -1,26 +1,17 @@
----
-# Argus homelab inventory template.
-# Copy to homelab.yml and fill in the IPs from `terraform output`.
-#   control_plane_ip  -> k8s-control
-#   worker_ips        -> k8s-worker-1, k8s-worker-2
+# Copy this file to `homelab.yml` and fill in the IPs from your Terraform output.
+# Example: cp ansible/inventory/homelab.yml.example ansible/inventory/homelab.yml
+
 all:
-  vars:
-    ansible_user: root
-    # ansible_ssh_private_key_file: ~/.ssh/argus_homelab
-    # k3s version for all nodes ("" = latest stable)
-    k3s_version: ""
+  hosts:
+    # Replace with your control plane IP
+    <CONTROL_PLANE_IP>:
+      ansible_user: <YOUR_SSH_USER>
+      ansible_ssh_private_key_file: <PATH_TO_YOUR_SSH_KEY>
   children:
-    k3s_server:
-      hosts:
-        k8s-control:
-          ansible_host: <CONTROL_PLANE_IP>
-    k3s_agent:
-      hosts:
-        k8s-worker-1:
-          ansible_host: <WORKER_1_IP>
-        k8s-worker-2:
-          ansible_host: <WORKER_2_IP>
     k3s_cluster:
-      children:
-        k3s_server:
-        k3s_agent:
+      hosts:
+        # Replace with your control plane IP
+        <CONTROL_PLANE_IP>:
+        # Replace with your worker node IPs (if any)
+        # <WORKER_NODE_1_IP>:
+        # <WORKER_NODE_2_IP>:
