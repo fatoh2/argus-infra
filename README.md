@@ -1,42 +1,87 @@
-# Argus Infra
+# Argus Infra 🚀
 
-## Project Overview
-Argus Infra is the foundational Kubernetes homelab platform for the Argus project. It provides a robust, automated, and GitOps-driven infrastructure for deploying and managing applications. This repository contains all the necessary configurations for provisioning virtual machines, setting up a k3s Kubernetes cluster, and bootstrapping ArgoCD for continuous deployment.
+[![Sanity Checks](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml)
 
-## Architecture Diagram
+**A production-grade Kubernetes homelab platform on Hetzner Cloud** — provisioned with Terraform, configured with Ansible, and managed via GitOps with ArgoCD.
+
+## Overview
+
+Argus Infra provides a complete, reproducible Kubernetes cluster running on Hetzner Cloud VMs. Everything is defined as code:
+
+| Layer | Tool | Purpose |
+|-------|------|---------|
+| **Infrastructure** | Terraform | Provision Hetzner VMs, networks, SSH keys |
+| **Configuration** | Ansible | Install k3s, configure nodes, firewall rules |
+| **GitOps** | ArgoCD | Declarative app deployment, self-healing |
+| **Ingress** | Traefik + cert-manager | HTTP routing, automatic TLS via Let's Encrypt |
+| **Monitoring** | Prometheus + Grafana + Loki | Metrics, dashboards, log aggregation |
+| **Secrets** | External Secrets Operator + Doppler | Secure secret injection |
+
+## Quick Start
+
+```bash
+# 1. Provision VMs
+cd terraform/environments/homelab
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your Hetzner token
+terraform init && terraform apply
+
+# 2. Install k3s
+cd ansible
+cp inventory/homelab.yml.example inventory/homelab.yml
+# Edit inventory with VM IPs from terraform output
+ansible-playbook -i inventory/homelab.yml playbooks/site.yml
+
+# 3. Bootstrap ArgoCD
+kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+```
+
+See the [full setup guide](docs/setup.md) for detailed instructions.
+
+## Repository Structure
 
 ```
-+-------------------+       +-------------------+       +-------------------+
-|     Hetzner       |       |     Ansible       |       |      ArgoCD       |
-|    Cloud (VMs)    |       |    Controller     |       |    (GitOps)       |
-+---------+---------+       +---------+---------+       +---------+---------+
-          |                           |                           |
-          | Terraform                 | Ansible                   | GitOps
-          | Provisioning              | Configuration             | Deployments
-          v                           v                           v
-+---------+---------+       +---------+---------+       +---------+---------+
-|   Virtual Machines  |----->|    k3s Cluster    |<----->|   GitHub Repo   |
-| (Ubuntu, Docker)    |       | (Control Plane &  |       | (k8s manifests) |
-+---------------------+       |     Agents)       |       +-----------------+
-                              +-------------------+
+argus-infra/
+├── terraform/              # Hetzner Cloud provisioning
+│   └── environments/homelab/
+├── ansible/                # k3s cluster configuration
+│   ├── inventory/
+│   ├── playbooks/
+│   └── roles/
+├── k8s/                    # Kubernetes manifests (source of truth)
+│   ├── argocd/             # ArgoCD app-of-apps definitions
+│   │   ├── apps/           # Individual application manifests
+│   │   └── config/         # ArgoCD configuration
+│   ├── ingress/            # Traefik, cert-manager, TLS
+│   ├── monitoring/         # Prometheus stack
+│   ├── grafana/            # Grafana dashboards & provisioning
+│   └── cluster-issuer/     # Let's Encrypt ClusterIssuers
+├── docs/                   # Documentation
+│   ├── architecture.md     # System architecture
+│   ├── setup.md            # Setup guide
+│   └── adr/                # Architecture Decision Records
+└── .github/workflows/      # CI pipeline
 ```
 
-## What it Does
-- **Automated VM Provisioning**: Uses Terraform to provision virtual machines on Hetzner Cloud.
-- **Kubernetes Cluster Setup**: Leverages Ansible to install and configure a k3s Kubernetes cluster.
-- **GitOps with ArgoCD**: Bootstraps ArgoCD to manage Kubernetes applications declaratively from Git.
-- **Infrastructure as Code**: All infrastructure components are defined as code, enabling version control, reproducibility, and automated deployments.
+## Key Features
 
-## Tech Stack
-- **Cloud Provider**: Hetzner Cloud
-- **Infrastructure Provisioning**: Terraform
-- **Configuration Management**: Ansible
-- **Kubernetes Distribution**: k3s
-- **GitOps**: ArgoCD
-- **Container Runtime**: containerd (managed by k3s)
-- **Operating System**: Ubuntu Server
+- **Fully GitOps-driven** — all cluster state defined in Git, ArgoCD syncs automatically
+- **Automatic TLS** — wildcard certificate via Let's Encrypt + cert-manager
+- **Observability out of the box** — Prometheus metrics, Grafana dashboards, Loki logs
+- **Secure by default** — External Secrets Operator for secrets, private network for nodes
+- **CI-validated** — Terraform validate, Ansible lint, syntax checks on every PR
 
-## Documentation
-- [Setup Guide](docs/setup.md)
-- [Architecture Decision Records](docs/adr/)
-- [Operational Runbooks](docs/runbooks.md)
+## Architecture
+
+See [docs/architecture.md](docs/architecture.md) for a detailed breakdown of all components.
+
+## Prerequisites
+
+- [Hetzner Cloud](https://www.hetzner.com/cloud) account with API token
+- [Terraform](https://developer.hashicorp.com/terraform/downloads) v1.0+
+- [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/index.html) v2.10+
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+
+## License
+
+MIT
