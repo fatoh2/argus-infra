@@ -80,7 +80,7 @@ argus-infra/
 - **Observability out of the box** — Prometheus metrics, Grafana dashboards, Loki logs
 - **Secure by default** — External Secrets Operator for secrets, private network for nodes
 - **Network Policies** — default-deny on all namespaces with explicit allow rules for least-privilege pod communication
-- **CI-validated** — Terraform validate + fmt, Ansible syntax check + lint, ShellCheck, critical file checks on every PR
+- **CI-validated** — Terraform validate + fmt, Ansible syntax check + lint, ShellCheck, critical file checks, and comprehensive cluster sanity checks on every PR
 - **Cluster health monitoring** — scheduled cluster sanity checks (nodes, pods, ArgoCD apps, ingress) every 6 hours
 - **Local sanity suite** — run `./scripts/run-sanity-checks.sh` before committing to catch issues early
 
