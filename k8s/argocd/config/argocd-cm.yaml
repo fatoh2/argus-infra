@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+data:
+  # Disable anonymous access
+  users.anonymous.enabled: "false"
+  # Configure a custom login banner (optional)
+  ui.banner: "Welcome to Argus ArgoCD. Unauthorized access is prohibited."

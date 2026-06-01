@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+data:
+  # RBAC policy for ArgoCD
+  # Example: Allow read-only access to all applications in all projects for a specific group
+  # p, role:readonly, applications, get, */*, allow
+  # g, your-github-team, role:readonly
+
+  # Default policy: deny all access unless explicitly allowed
+  policy.default: deny
+
+  # Admin role (built-in)
+  # p, role:admin, applications, *, */*, allow
+  # p, role:admin, clusters, *, *, allow
+  # p, role:admin, projects, *, *, allow
+  # p, role:admin, repositories, *, *, allow
+  # p, role:admin, certificates, *, *, allow
+  # p, role:admin, accounts, *, *, allow
+  # p, role:admin, GPGKeys, *, *, allow
+  # p, role:admin, exec, *, *, allow
+
+  # Example: Allow 'admin' user to manage everything
+  # g, admin, role:admin
