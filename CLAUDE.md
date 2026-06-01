@@ -21,6 +21,8 @@ configured with Ansible, and operated via ArgoCD GitOps.
 - `ansible/`: Ansible playbooks and roles for configuring Kubernetes and other services.
 - `kubernetes/`: Kubernetes manifests and Helm charts for deploying applications via ArgoCD.
 - `docs/`: Documentation for setup, operations, and architecture.
+- `helm/base-app/`: Shared chart template all apps extend
+- `scripts/`: Utility scripts for bootstrapping and operations
 
 ## Non-Negotiable Rules
 - **NEVER** run `terraform destroy` without explicit user confirmation in Telegram.
@@ -34,11 +36,29 @@ configured with Ansible, and operated via ArgoCD GitOps.
 - **ALWAYS** update `docs/setup.md` when adding or changing operational procedures.
 
 ## PR Format
-Every PR you open must include:
-- What changed and why (link to issue)
-- How to test
-- Any risks or migration steps
-- Checklist: tests passing, CLAUDE.md rules followed, no secrets committed
+```
+Title: [infra] short description
+
+Body:
+## What changed
+<why this change was needed>
+
+## Terraform plan output
+<paste terraform plan diff here>
+
+## Risks
+<what could go wrong>
+
+## Rollback
+<how to revert if something breaks>
+
+## Checklist
+- [ ] helm lint passed
+- [ ] terraform plan reviewed
+- [ ] No secrets in diff
+- [ ] Runbook updated (if applicable)
+- [ ] Resource limits set on all new pods
+```
 
 ## Escalate to PM when
 - Any change to firewall rules or network policies
