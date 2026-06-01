@@ -4,25 +4,3 @@ metadata:
   name: security
   namespace: argocd
 spec:
-<<<<<<< HEAD
-  destination:
-    namespace: security
-    server: https://kubernetes.default.svc
-  project: default
-  source:
-    path: k8s/security
-    repoURL: https://github.com/fatoh2/argus-infra
-    targetRevision: main
-=======
-  project: default
-  source:
-    repoURL: https://github.com/fatoh2/argus-infra.git
-    targetRevision: HEAD
-    path: k8s/security
->>>>>>> origin/develop
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-    - CreateNamespace=true
