@@ -4,17 +4,17 @@ metadata:
   name: monitoring
   namespace: argocd
 spec:
+  destination:
+    namespace: monitoring
+    server: https://kubernetes.default.svc
   project: default
   source:
+    path: k8s/monitoring
     repoURL: https://github.com/fatoh2/argus-infra
     targetRevision: main
-    path: k8s/monitoring
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: monitoring # Target namespace for monitoring applications
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
+    - CreateNamespace=true

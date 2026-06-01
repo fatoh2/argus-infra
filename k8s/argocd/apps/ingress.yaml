@@ -4,17 +4,17 @@ metadata:
   name: ingress
   namespace: argocd
 spec:
+  destination:
+    namespace: ingress
+    server: https://kubernetes.default.svc
   project: default
   source:
+    path: k8s/ingress
     repoURL: https://github.com/fatoh2/argus-infra
     targetRevision: main
-    path: k8s/ingress
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: ingress # Target namespace for ingress applications
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
+    - CreateNamespace=true

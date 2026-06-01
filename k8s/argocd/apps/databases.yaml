@@ -4,17 +4,17 @@ metadata:
   name: databases
   namespace: argocd
 spec:
+  destination:
+    namespace: databases
+    server: https://kubernetes.default.svc
   project: default
   source:
+    path: k8s/databases
     repoURL: https://github.com/fatoh2/argus-infra
     targetRevision: main
-    path: k8s/databases
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: databases # Target namespace for database applications
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
+    - CreateNamespace=true
