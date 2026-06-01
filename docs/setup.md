@@ -17,7 +17,8 @@ This document outlines the steps to set up ArgoCD on the Kubernetes cluster usin
 
 2.  **Bootstrap ArgoCD**
 
-    Run the bootstrap script to install ArgoCD and set up the root app-of-apps.
+    Manually bootstrap ArgoCD by running the following commands and set up the root app-of-apps.
+
 
     Applying ArgoCD install manifests...
     ```bash
@@ -35,6 +36,7 @@ This document outlines the steps to set up ArgoCD on the Kubernetes cluster usin
     
 
 4.  **Access ArgoCD UI**
+
 
     Port-forward the ArgoCD server to access the UI:
     ```bash
