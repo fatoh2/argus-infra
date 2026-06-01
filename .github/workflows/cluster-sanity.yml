@@ -1,0 +1,84 @@
+name: Cluster Sanity
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_argocd:
+        description: 'Skip ArgoCD health checks'
+        required: false
+        default: false
+        type: boolean
+      skip_ingress:
+        description: 'Skip ingress reachability tests'
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    # Run every 6 hours: at minute 0 past every 6th hour.
+    - cron: '0 */6 * * *'
+
+env:
+  # Set to 'true' in repository variables to enable cluster sanity checks.
+  # This avoids using secrets in job-level if conditions, which are not
+  # available for pull_request events from forks.
+  CLUSTER_SANITY_ENABLED: ${{ vars.CLUSTER_SANITY_ENABLED || 'false' }}
+
+jobs:
+  cluster-sanity:
+    runs-on: ubuntu-latest
+    # Only run if the repository variable CLUSTER_SANITY_ENABLED is set to 'true'.
+    # This prevents the workflow from failing in forks or PRs without cluster access.
+    # Repository variables ARE accessible in if: conditions (unlike secrets).
+    if: env.CLUSTER_SANITY_ENABLED == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.30.0'
+
+      - name: Configure cluster access
+        env:
+          KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG }}
+        run: |
+          # Write kubeconfig from secret to a temp file, then use KUBECONFIG env var
+          # to point kubectl at it. This avoids echoing the secret content into a file
+          # which could leak in debug output.
+          KUBECONFIG_FILE=$(mktemp /tmp/kubeconfig.XXXXXX)
+          echo "$KUBECONFIG_CONTENT" > "$KUBECONFIG_FILE"
+          chmod 600 "$KUBECONFIG_FILE"
+          echo "KUBECONFIG=$KUBECONFIG_FILE" >> "$GITHUB_ENV"
+          kubectl config set-context --current --namespace=argocd 2>/dev/null || true
+
+      - name: Verify cluster connectivity
+        run: |
+          echo "Checking cluster connectivity..."
+          kubectl cluster-info --request-timeout=10s
+          echo "Current context: $(kubectl config current-context)"
+          echo "Nodes:"
+          kubectl get nodes
+
+      - name: Run cluster sanity checks
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.skip_argocd }}" = "true" ]; then
+            ARGS="$ARGS --skip-argocd"
+          fi
+          if [ "${{ github.event.inputs.skip_ingress }}" = "true" ]; then
+            ARGS="$ARGS --skip-ingress"
+          fi
+          bash scripts/cluster-sanity.sh $ARGS --verbose
+
+      - name: Run ArgoCD health check
+        run: |
+          bash scripts/argocd-health.sh --verbose
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::warning::Cluster sanity checks failed! Check the workflow logs for details."
+          # In the future, this could send a notification via Telegram or Slack.
+          # For now, the workflow run failure itself is the alert.
