@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: traefik
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://helm.traefik.io/traefik
+    targetRevision: 26.0.0 # Use a specific version
+    chart: traefik
+    helm:
+      values: |
+        ports:
+          web:
+            redirectTo: websecure
+          websecure:
+            tls:
+              enabled: true
+        providers:
+          kubernetesIngress:
+            enabled: true
+            publishedService:
+              enabled: true
+        service:
+          annotations:
+            service.beta.kubernetes.io/do-loadbalancer-enable-proxy-protocol: "true"
+            service.beta.kubernetes.io/do-loadbalancer-hostname: "traefik.YOUR_CLUSTER_DOMAIN" # Placeholder
+            service.beta.kubernetes.io/do-loadbalancer-name: "traefik-lb"
+          spec:
+            externalTrafficPolicy: Local
+            type: LoadBalancer
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: traefik
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

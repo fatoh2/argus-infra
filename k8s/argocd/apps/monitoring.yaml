@@ -9,12 +9,33 @@ spec:
     server: https://kubernetes.default.svc
   project: default
   source:
-    path: k8s/monitoring
-    repoURL: https://github.com/fatoh2/argus-infra
-    targetRevision: develop
+    repoURL: https://prometheus-community.github.io/helm-charts
+    targetRevision: 45.2.0 # Use a specific version
+    chart: kube-prometheus-stack
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-    - CreateNamespace=true
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki-stack
+  namespace: argocd
+spec:
+  destination:
+    namespace: monitoring
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    targetRevision: 2.9.10 # Use a specific version
+    chart: loki-stack
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

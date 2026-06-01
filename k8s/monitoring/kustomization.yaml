@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+helmCharts:
+  - name: kube-prometheus-stack
+    repo: https://prometheus-community.github.io/helm-charts
+    version: 45.2.0
+    releaseName: kube-prometheus-stack
+    namespace: monitoring
+    valuesFile: kube-prometheus-stack-values.yaml
+  - name: loki-stack
+    repo: https://grafana.github.io/helm-charts
+    version: 2.9.10
+    releaseName: loki-stack
+    namespace: monitoring
+    valuesFile: loki-stack-values.yaml

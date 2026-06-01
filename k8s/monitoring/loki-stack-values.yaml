@@ -1,0 +1,12 @@
+loki:
+  persistence:
+    enabled: true
+    size: 50Gi
+promtail:
+  enabled: true
+  extraArgs:
+    - -config.file=/etc/promtail/config.yaml
+  config:
+    snippets:
+      pipelineStages:
+        - docker:

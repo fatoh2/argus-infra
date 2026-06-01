@@ -1,0 +1,14 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-argus-infra-tls
+  namespace: traefik # Or a dedicated ingress namespace
+spec:
+  secretName: wildcard-argus-infra-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: "*.YOUR_CLUSTER_DOMAIN" # Placeholder
+  dnsNames:
+    - "*.YOUR_CLUSTER_DOMAIN"
+    - "YOUR_CLUSTER_DOMAIN"
