@@ -2,49 +2,6 @@
 
 This document provides an in-depth explanation of the Argus Infra components and their interactions, detailing the design choices and how they contribute to a robust and scalable Kubernetes homelab platform.
 
-graph TD
-    subgraph Hetzner Cloud
-        HCN[Hetzner Cloud Network] --> HCS[Hetzner Cloud Subnet]
-        HCS --> KCM(k8s-control)
-        HCS --> KWM1(k8s-worker-1)
-        HCS --> KWM2(k8s-worker-2)
-    end
-
-    subgraph Kubernetes Cluster (k3s)
-        KCM -- "API Server, Controller Manager, Scheduler" --> KWM1
-        KCM -- "API Server, Controller Manager, Scheduler" --> KWM2
-        KWM1 -- "kubelet, kube-proxy" --> KCM
-        KWM2 -- "kubelet, kube-proxy" --> KCM
-        KCM -- "etcd (embedded)" --> KCM
-        KCM -- "CoreDNS, Traefik (default ingress)" --> KCM
-    end
-
-    subgraph GitOps Workflow
-        GH[GitHub: argus-infra repo] --> ARGO[ArgoCD]
-        ARGO -- "Sync Kubernetes Manifests" --> KCM
-    end
-
-    subgraph External Services
-        DNS[External DNS] --> KCM
-        LE[Let's Encrypt] --> CertMan[cert-manager]
-        CertMan --> KCM
-        Doppler[Doppler Secrets] --> ESO[External Secrets Operator]
-        ESO --> KCM
-    end
-
-    style Hetzner Cloud fill:#f9f,stroke:#333,stroke-width:2px
-    style Kubernetes Cluster (k3s) fill:#ccf,stroke:#333,stroke-width:2px
-    style GitOps Workflow fill:#cfc,stroke:#333,stroke-width:2px
-    style External Services fill:#ffc,stroke:#333,stroke-width:2px
-
-    click KCM "https://k3s.io/"
-    click ARGO "https://argoproj.github.io/"
-    click ESO "https://external-secrets.io/"
-    click Doppler "https://www.doppler.com/"
-    click CertMan "https://cert-manager.io/"
-    click DNS "https://github.com/kubernetes-sigs/external-dns"
-
-```
 
 ## 2. Infrastructure Provisioning (Terraform/OpenTofu)
 
