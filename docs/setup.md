@@ -1,61 +1,192 @@
 # Argus Infrastructure Setup Guide
 
-This document outlines the process for setting up the Argus infrastructure, including VM provisioning, Ansible configuration, ArgoCD bootstrapping, and application deployment.
+This document outlines the comprehensive process for setting up the Argus infrastructure from scratch, including VM provisioning on Hetzner Cloud, Ansible configuration, k3s cluster deployment, and ArgoCD bootstrapping for GitOps management.
 
-## 1. VM Provisioning (Terraform/OpenTofu)
+## Prerequisites
 
-Refer to the `terraform/` directory for provisioning virtual machines on Hetzner Cloud.
+Before you begin, ensure you have the following:
 
-## 2. Ansible Configuration
+-   **Hetzner Cloud Account:** An active account with sufficient credit.
+-   **Hetzner Cloud API Token:** Generate a read/write API token from your Hetzner Cloud Project > Security > API Tokens. Keep this token secure.
+-   **SSH Key Pair:** An SSH key pair (e.g., `~/.ssh/id_rsa` and `~/.ssh/id_rsa.pub`). The public key must be uploaded to your Hetzner Cloud project.
+-   **Local Tools:**
+    -   **Terraform/OpenTofu (`>= 1.5`):** For infrastructure provisioning.
+    -   **Ansible (`>= 2.10`):** For configuration management.
+    -   **Git:** For cloning repositories and version control.
+    -   **kubectl:** Kubernetes command-line tool (will be configured after k3s setup).
+    -   **argocd CLI:** ArgoCD command-line tool (will be installed during setup).
 
-Refer to the `ansible/` directory for configuring nodes, installing k3s, and hardening the system.
+## 1. Clone the Repository
 
-## 3. ArgoCD Bootstrapping
+Start by cloning the `argus-infra` repository to your local machine:
 
-Use the `scripts/bootstrap-argocd.sh` script to install ArgoCD and deploy the initial "app-of-apps" manifest.
+```bash
+git clone https://github.com/fatoh2/argus-infra.git
+cd argus-infra
+```
 
-**Important Considerations for ArgoCD:**
+## 2. VM Provisioning (Terraform/OpenTofu)
 
-*   **Security Configuration:** ArgoCD's security settings, including RBAC and authentication methods, are configured via `k8s/argocd/config/argocd-rbac-cm.yaml` and `k8s/argocd/config/argocd-cm.yaml`. Ensure these are reviewed and configured appropriately for your environment, including disabling anonymous access and securing the initial admin password retrieval.
-*   **Git Repository Validation:** Implement pre-commit hooks or CI checks to validate the structure and content of ArgoCD application manifests in the Git repository before merging. This helps prevent sync errors due to malformed configurations.
-*   **Race Conditions with Self-Healing:** Be aware that `syncPolicy.automated.selfHeal: true` and `prune: true` can lead to race conditions if manual changes are made directly to the cluster and the Git repository is updated simultaneously. Clearly define operational procedures for when direct cluster modifications are allowed and how they should be reconciled with GitOps. Educate users on the implications of these settings.
+This step provisions the virtual machines on Hetzner Cloud that will form your Kubernetes cluster.
 
-## 4. Application Deployment
+### 2.1. Configure Terraform Variables
 
-ArgoCD will manage the deployment of applications defined in `k8s/argocd/apps/`.
+Navigate to the Terraform environment directory and create your `terraform.tfvars` file. **This file is `.gitignore`d and should never be committed to Git.**
 
-**Best Practices for Kubernetes Manifests:**
+```bash
+cd terraform/environments/homelab
+cp terraform.tfvars.example terraform.tfvars
+```
 
-*   **Modularity:** Break down large Kubernetes manifests into smaller, modular files. This improves readability, maintainability, and can prevent performance issues with ArgoCD sync times. Consider using Helm charts or Kustomize overlays for managing complexity.
+Edit `terraform.tfvars` and set the following variables:
 
-## 5. Secrets Management
+-   `hcloud_token`: Your Hetzner Cloud API token.
+-   `ssh_key_name`: The name of the SSH key you uploaded to Hetzner Cloud.
+-   `location`: (Optional) The Hetzner Cloud datacenter location (e.g., `fsn1`, `nbg1`, `hel1`). Default is `fsn1`.
+-   `control_plane_type`: (Optional) VM type for the control plane (e.g., `cx11`, `cpx21`). Default is `cpx11`.
+-   `worker_type`: (Optional) VM type for worker nodes. Default is `cpx11`.
+-   `worker_count`: (Optional) Number of worker nodes. Default is `2`.
 
-Secrets are managed using External Secrets Operator and Doppler. Ensure all secret management configurations are thoroughly reviewed for proper encryption, access control, and rotation policies. Avoid exposing secrets in plain text.
+Example `terraform.tfvars`:
 
-## 6. Ingress and TLS
+```hcl
+hcloud_token = "your_hetzner_cloud_api_token"
+ssh_key_name = "your_ssh_key_name_on_hetzner"
+location     = "fsn1"
+```
 
-NGINX is used for ingress, with `cert-manager` handling TLS certificates from Let's Encrypt. Ensure TLS is correctly configured and certificates are properly rotated to prevent security vulnerabilities. This includes configuring `cert-manager` issuers and certificate resources, and ensuring TLS secrets are correctly referenced by ingress resources.
+### 2.2. Initialize and Apply Terraform
 
-### Security Considerations
+```bash
+terraform init
+terraform plan # Review the resources that will be created
+terraform apply --auto-approve
+```
 
-*   **ArgoCD RBAC:** The default  provides a broad admin role. For production environments, it is crucial to implement stricter RBAC policies and leverage ArgoCD Projects to restrict application deployments to specific namespaces and control user permissions.
-*   **Secrets Management:** This setup integrates with External Secrets Operator and Doppler. Ensure that all secret management configurations are thoroughly reviewed for proper encryption, access control, and rotation policies. Never commit sensitive information directly to Git.
-*   **TLS Configuration:** For production, ensure that Ingress controllers (e.g., NGINX) are configured with TLS using  for automatic certificate provisioning and renewal. Verify that certificates are correctly managed and rotated to prevent man-in-the-middle attacks.
+Upon successful application, Terraform will output the public IP addresses of your control plane and worker nodes. Make a note of these, especially the `control_plane_ip` and `worker_ips`.
 
-### Operational Best Practices
+## 3. Ansible Configuration and k3s Deployment
 
-*   **Git Repository Validation:** Implement pre-commit hooks or CI checks to validate the structure and content of ArgoCD application manifests in the Git repository. This helps prevent malformed configurations from reaching the cluster.
-*   **Self-Healing and Pruning:** Be aware that  and  can lead to race conditions if manual changes are made directly to the cluster. Clearly define operational procedures for when direct cluster modifications are allowed and how they should be reconciled with GitOps.
-*   **Modular Manifests:** Break down large Kubernetes manifests into smaller, modular files. This improves readability, maintainability, and can prevent performance issues with ArgoCD sync operations.
+Ansible is used to configure the provisioned VMs, install k3s, and join the worker nodes to the cluster.
 
-### Security Considerations
+### 3.1. Update Ansible Inventory
 
-*   **ArgoCD RBAC:** The default `argocd-rbac-cm.yaml` provides a broad admin role. For production environments, it is crucial to implement stricter RBAC policies and leverage ArgoCD Projects to restrict application deployments to specific namespaces and control user permissions.
-*   **Secrets Management:** This setup integrates with External Secrets Operator and Doppler. Ensure that all secret management configurations are thoroughly reviewed for proper encryption, access control, and rotation policies. Never commit sensitive information directly to Git.
-*   **TLS Configuration:** For production, ensure that Ingress controllers (e.g., NGINX) are configured with TLS using `cert-manager` for automatic certificate provisioning and renewal. Verify that certificates are correctly managed and rotated to prevent man-in-the-middle attacks.
+Navigate back to the root of the `argus-infra` repository and then into the `ansible` directory.
 
-### Operational Best Practices
+```bash
+cd ../../ansible
+```
 
-*   **Git Repository Validation:** Implement pre-commit hooks or CI checks to validate the structure and content of ArgoCD application manifests in the Git repository. This helps prevent malformed configurations from reaching the cluster.
-*   **Self-Healing and Pruning:** Be aware that `syncPolicy.automated.selfHeal: true` and `prune: true` can lead to race conditions if manual changes are made directly to the cluster. Clearly define operational procedures for when direct cluster modifications are allowed and how they should be reconciled with GitOps.
-*   **Modular Manifests:** Break down large Kubernetes manifests into smaller, modular files. This improves readability, maintainability, and can prevent performance issues with ArgoCD sync operations.
+Create or update the `inventory/homelab.yml` file with the public IP addresses of your control plane and worker nodes obtained from the Terraform output. Replace the placeholder IPs with your actual IPs. A good practice is to use a tool or script to generate this from Terraform outputs, but for manual setup, you can create it as follows:
+
+Example `inventory/homelab.yml` snippet:
+
+```yaml
+all:
+  hosts:
+    k8s-control:
+      ansible_host: YOUR_CONTROL_PLANE_PUBLIC_IP
+    k8s-worker-1:
+      ansible_host: YOUR_WORKER_1_PUBLIC_IP
+    k8s-worker-2:
+      ansible_host: YOUR_WORKER_2_PUBLIC_IP
+  children:
+    k3s_control_plane:
+      hosts:
+        k8s-control:
+    k3s_node:
+      hosts:
+        k8s-worker-1:
+        k8s-worker-2:
+```
+
+### 3.2. Run Ansible Playbook
+
+Execute the Ansible playbook to set up k3s on your nodes, specifying the inventory file:
+
+```bash
+ansible-playbook -i inventory/homelab.yml playbooks/site.yml
+```
+
+This playbook will:
+-   Install necessary dependencies.
+-   Configure the firewall.
+-   Install k3s on the control plane node.
+-   Join worker nodes to the k3s cluster.
+-   Copy the `kubeconfig` file from the control plane to your local machine.
+
+### 3.3. Configure kubectl
+
+The Ansible playbook will place the `kubeconfig` file in `~/.kube/config-argus-infra`. You can use it directly or merge it with your existing `kubeconfig`.
+
+To use it directly:
+
+```bash
+export KUBECONFIG=~/.kube/config-argus-infra
+kubectl get nodes
+```
+
+You should see your `k8s-control` and `k8s-worker-X` nodes in a `Ready` state.
+
+## 4. ArgoCD Bootstrapping
+
+ArgoCD is deployed to manage your Kubernetes applications using GitOps principles.
+
+### 4.1. Install ArgoCD CLI
+
+```bash
+# For Linux
+curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argocd/releases/latest/download/argocd-linux-amd64
+chmod +x /usr/local/bin/argocd
+
+# For macOS (using Homebrew)
+# brew install argocd
+```
+
+### 4.2. Run ArgoCD Bootstrap Script
+
+Navigate to the `scripts` directory and execute the bootstrap script:
+
+```bash
+cd ../scripts
+./bootstrap-argocd.sh
+```
+
+This script will:
+-   Create the `argocd` namespace.
+-   Install ArgoCD components into the cluster.
+-   Configure ArgoCD to sync from the `k8s/argocd/apps` directory in this repository.
+
+### 4.3. Access ArgoCD UI
+
+To access the ArgoCD web UI, first retrieve the initial admin password:
+
+```bash
+argocd admin initial-password -n argocd
+```
+
+Then, port-forward the ArgoCD server to your local machine:
+
+```bash
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+```
+
+Open your browser to `https://localhost:8080` and log in with username `admin` and the password you retrieved. Accept the self-signed certificate warning.
+
+### 4.4. Configure Git Repository in ArgoCD
+
+ArgoCD needs to know about your `argus-infra` Git repository. While the `bootstrap-argocd.sh` script attempts to set this up, you might need to manually add it if using a private repository or specific SSH keys.
+
+From the ArgoCD UI:
+1.  Go to `Settings` > `Repositories`.
+2.  Click `+ NEW REPO`.
+3.  Enter the repository URL (`https://github.com/fatoh2/argus-infra.git`).
+4.  If it's a private repo, configure SSH or HTTPS credentials.
+
+Alternatively, using the CLI:
+
+```bash
+argocd repo add https://github.com/fatoh2/argus-infra.git --username <your-github-username> --password <your-github-token>
+```
+
+**Note:** For private repositories, it is recommended to use SSH keys for ArgoCD to access the repository. Refer to the ArgoCD documentation for detailed instructions on configuring SSH repository access.

@@ -33,7 +33,7 @@ This runbook details the process of provisioning the virtual machines for the Ku
     ```bash
     terraform apply --auto-approve
     ```
-    This command will create the private network, subnet, and three virtual machines (one control plane, two workers) on Hetzner Cloud.
+    This command will create the private network, subnet, and virtual machines (one control plane, two workers by default) on Hetzner Cloud.
 
 ### Outputs
 Upon successful application, Terraform will output important information:
@@ -59,7 +59,7 @@ Applications are deployed and updated via ArgoCD, following GitOps principles. C
 -   You have access to the Git repository containing your Kubernetes manifests.
 
 ### Steps
-1.  Make changes to your application's Kubernetes manifests (e.g., deployments, services, ingresses) in the designated Git repository (e.g., `k8s/core` in `argus-infra`).
+1.  Make changes to your application's Kubernetes manifests (e.g., deployments, services, ingresses) in the designated Git repository (e.g., `k8s/argocd/apps` in `argus-infra`).
 2.  Commit and push your changes to the `develop` branch (or the branch ArgoCD is configured to monitor).
     ```bash
     git add .
@@ -103,110 +103,90 @@ Scaling the cluster involves adding or removing worker nodes. This process combi
     -   Run `terraform plan` to review the changes.
     -   Run `terraform apply --auto-approve` to provision the new VMs.
 2.  **Update Ansible Inventory:**
-    -   After new VMs are provisioned, update `ansible/inventory.ini` with the public IP addresses of the new worker nodes.
-    -   Add new entries under the `[k3s_node]` section, similar to existing worker nodes.
+    -   After new VMs are provisioned, update `ansible/inventory/homelab.yml` with the public IP addresses of the new worker nodes.
+    -   Add new entries under the `k3s_node` group, similar to existing worker nodes.
 3.  **Run Ansible Playbook:**
     -   Execute the Ansible playbook to join the new worker nodes to the k3s cluster:
         ```bash
         cd ansible
-        ansible-playbook -i inventory.ini playbook.yml
+        ansible-playbook -i inventory/homelab.yml playbooks/site.yml
         ```
 4.  **Verify:** Check the cluster status to ensure the new nodes are `Ready`:
     ```bash
-    kubeconfig=~/.kube/config-argus-infra kubectl get nodes
+    export KUBECONFIG=~/.kube/config-argus-infra
+    kubectl get nodes
     ```
 
 ### To Remove Worker Nodes
 1.  **Drain and Delete Node (Kubernetes):**
     -   First, cordon and drain the node you wish to remove to gracefully evict pods:
         ```bash
-        kubeconfig=~/.kube/config-argus-infra kubectl cordon k8s-worker-X
-        kubeconfig=~/.kube/config-argus-infra kubectl drain k8s-worker-X --ignore-daemonsets --delete-emptydir-data
+        export KUBECONFIG=~/.kube/config-argus-infra
+        kubectl cordon k8s-worker-X
+        kubectl drain k8s-worker-X --ignore-daemonsets --delete-emptydir-data
         ```
     -   Then, delete the node from the Kubernetes cluster:
         ```bash
-        kubeconfig=~/.kube/config-argus-infra kubectl delete node k8s-worker-X
+        export KUBECONFIG=~/.kube/config-argus-infra
+        kubectl delete node k8s-worker-X
         ```
 2.  **Update Terraform Configuration:**
     -   Edit `terraform/environments/homelab/main.tf` to decrease the `worker_count` variable or remove the specific worker node definition.
     -   Run `terraform plan` to review the changes.
     -   Run `terraform apply --auto-approve` to de-provision the VM from Hetzner Cloud.
 3.  **Update Ansible Inventory:**
-    -   Remove the corresponding entry for the deleted worker node from `ansible/inventory.ini`.
-
-## 5. Troubleshooting Common Issues
-
-This section provides guidance for diagnosing and resolving common issues within the Argus Infra environment.
-
-### 5.1. SSH Connection Issues to VMs
-
-**Problem:** Cannot SSH into a newly provisioned VM or an existing node.
-
-**Possible Causes & Solutions:**
--   **Incorrect IP Address:** Double-check the public IP address from Terraform outputs or Hetzner Cloud console.
--   **SSH Key Mismatch:** Ensure the correct SSH key is loaded in your SSH agent (`ssh-add -l`) and that the corresponding public key is registered with Hetzner Cloud and associated with the VM.
--   **Firewall Rules:** Verify Hetzner Cloud firewall rules allow SSH (port 22) traffic from your IP address.
--   **VM Not Running:** Check the VM status in the Hetzner Cloud console.
-
-### 5.2. Kubernetes Nodes Not Ready
-
-**Problem:** `kubectl get nodes` shows one or more nodes in `NotReady` state.
-
-**Possible Causes & Solutions:**
--   **Network Connectivity:** Ensure private network connectivity between control plane and worker nodes. Check `ping` between nodes using their private IPs.
--   **k3s Service Status:** SSH into the problematic node and check the k3s service status:
+    -   Remove the entry for the deleted worker node from `ansible/inventory/homelab.yml`.
+4.  **Verify:** Check the cluster status to ensure the node is no longer present:
     ```bash
-    systemctl status k3s # For control plane
-    systemctl status k3s-agent # For worker nodes
-    journalctl -u k3s # Or k3s-agent for logs
+    export KUBECONFIG=~/.kube/config-argus-infra
+    kubectl get nodes
     ```
--   **Resource Constraints:** Check CPU, memory, and disk usage on the node. Insufficient resources can cause nodes to become `NotReady`.
--   **Firewall on Node:** Ensure `ufw` or other host firewalls on the VM are not blocking necessary Kubernetes ports (e.g., 6443, 10250).
 
-### 5.3. ArgoCD Application Sync Failures
+## 5. Troubleshoot Common Issues
 
-**Problem:** ArgoCD application shows `Sync Failed` or `Degraded` status.
+### 5.1. SSH Connection Issues
 
-**Possible Causes & Solutions:**
--   **Manifest Errors:** Check the Kubernetes manifests in your Git repository for syntax errors or invalid configurations. ArgoCD UI will often show specific error messages.
--   **Resource Conflicts:** Another resource might already exist with the same name in the target namespace. Check `kubectl get events -n <namespace>`.
--   **Permissions Issues:** ArgoCD might not have sufficient permissions to create/update resources. Review ArgoCD's RBAC configuration.
--   **Network Connectivity to API Server:** Ensure ArgoCD can reach the Kubernetes API server.
--   **Git Repository Access:** Verify ArgoCD has correct credentials (SSH key or token) to access the Git repository.
+-   **Verify SSH Key:** Ensure your public SSH key is uploaded to Hetzner Cloud and the private key is correctly configured on your local machine.
+-   **Firewall:** Check Hetzner Cloud firewall rules and any host-based firewalls (e.g., `ufw` on Ubuntu) to ensure SSH port 22 is open.
+-   **IP Address:** Double-check the public IP address of the VM you are trying to connect to.
 
-### 5.4. Terraform Apply Failures
+### 5.2. Terraform Apply Failures
 
-**Problem:** `terraform apply` fails during provisioning.
+-   **API Token:** Ensure your `hcloud_token` in `terraform.tfvars` is correct and has read/write permissions.
+-   **Resource Limits:** Check your Hetzner Cloud project limits. You might be trying to provision more VMs or resources than allowed.
+-   **Syntax Errors:** Review your `terraform.tfvars` and `.tf` files for any syntax errors.
+-   **State File Corruption:** If `terraform apply` fails repeatedly, consider backing up and then deleting `terraform.tfstate` (only as a last resort in development environments) and re-running `terraform init` and `terraform apply`.
 
-**Possible Causes & Solutions:**
--   **Hetzner Cloud API Token:** Ensure your `hcloud_token` is correct and has sufficient permissions.
--   **Resource Limits:** You might have hit resource limits in your Hetzner Cloud project (e.g., maximum VMs). Check your project limits.
--   **SSH Key Name:** Verify `ssh_key_name` in `terraform.tfvars` exactly matches the name of the SSH key uploaded to Hetzner Cloud.
--   **Provider Issues:** Check Terraform provider documentation for Hetzner Cloud for any known issues or specific requirements.
+### 5.3. Ansible Playbook Failures
 
-## 6. Architecture Decision Records (ADRs)
+-   **SSH Connectivity:** Ensure Ansible can connect to all target VMs via SSH. Test with `ssh root@<ip>`.
+-   **Inventory File:** Verify that `ansible/inventory/homelab.yml` is correctly populated with the public IP addresses of your VMs.
+-   **Permissions:** Ensure the SSH user (default `root`) has necessary permissions on the target VMs.
+-   **Idempotency:** Ansible playbooks are designed to be idempotent. Rerunning the playbook often resolves transient issues.
 
-ADRs document significant architectural decisions made for the Argus Infra project. They explain the context, decision, and consequences.
+### 5.4. Kubernetes Pods Not Starting/Crashing
 
--   [ADR-0001-k3s-vs-kubeadm.md](adr/ADR-0001-k3s-vs-kubeadm.md): Decision to use k3s over kubeadm for Kubernetes cluster setup.
--   [ADR-0002-argocd-for-gitops.md](adr/ADR-0002-argocd-for-gitops.md): Decision to use ArgoCD for GitOps management.
-
-**Note:** New ADRs should be created for any significant architectural choices made during the project's evolution.
-
-## 7. Teardown Infrastructure
-
-This runbook describes how to completely destroy the Argus Infra environment. **This is a destructive operation and MUST be confirmed by the user in Telegram before execution.**
-
-### Steps
-1.  Navigate to the Terraform environment directory:
+-   **Check Pod Logs:**
     ```bash
-    cd terraform/environments/homelab
+    export KUBECONFIG=~/.kube/config-argus-infra
+    kubectl logs <pod-name> -n <namespace>
     ```
-2.  Initiate the destroy process:
+-   **Describe Pod:** Get detailed information about the pod, including events and conditions:
     ```bash
-    terraform destroy
+    export KUBECONFIG=~/.kube/config-argus-infra
+    kubectl describe pod <pod-name> -n <namespace>
     ```
-3.  Terraform will display a plan of all resources that will be destroyed. Carefully review this plan.
-4.  Confirm the destruction by typing `yes` when prompted.
+-   **Resource Limits:** Check if the pod is requesting more resources (CPU/memory) than available on the node.
+-   **Image Pull Issues:** Ensure the container image exists and is accessible from the cluster.
 
-**WARNING:** This will permanently delete all provisioned VMs, networks, and associated data on Hetzner Cloud. Ensure you have backed up any necessary data before proceeding.
+### 5.5. ArgoCD Sync Issues
+
+-   **Repository Access:** Verify ArgoCD has correct credentials to access the Git repository.
+-   **Manifest Errors:** Check Kubernetes manifests in Git for syntax errors or invalid configurations.
+-   **ArgoCD Logs:** Check ArgoCD server and application controller logs for errors:
+    ```bash
+    export KUBECONFIG=~/.kube/config-argus-infra
+    kubectl logs -f deploy/argocd-server -n argocd
+    kubectl logs -f deploy/argocd-application-controller -n argocd
+    ```
+-   **Manual Sync/Refresh:** In the ArgoCD UI, try a manual `Refresh` or `Sync` to force reconciliation.
