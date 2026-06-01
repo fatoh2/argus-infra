@@ -17,32 +17,34 @@ configured with Ansible, and operated via ArgoCD GitOps.
 - **Package manager**: Helm
 
 ## Repo Structure
-
+- `terraform/`: Terraform/OpenTofu configurations for provisioning infrastructure.
+- `ansible/`: Ansible playbooks and roles for configuring Kubernetes and other services.
+- `kubernetes/`: Kubernetes manifests and Helm charts for deploying applications via ArgoCD.
+- `docs/`: Documentation for setup, operations, and architecture.
 
 ## Non-Negotiable Rules
-- **NEVER** run 
-[0m[1m[32mNo changes.[0m[1m No objects need to be destroyed.[0m
-
-[0mEither you have not created any objects yet or the existing objects were
-already deleted outside of Terraform.
-[0m[1m[32m
-Destroy complete! Resources: 0 destroyed.[0m without explicit user confirmation in Telegram
-- **NEVER** use  on  namespace
-- **NEVER** commit secrets, tokens,  files, or kubeconfig files
-- **NEVER** push directly to  or  — always open a PR
-- **NEVER** change firewall rules or Doppler secrets without user escalation
-- **ALWAYS** add  AND  to every pod spec
-- **ALWAYS** run  and include the full diff in your PR description
-- **ALWAYS** run ==> Linting .
-Error unable to check Chart.yaml file in chart: stat Chart.yaml: no such file or directory before committing chart changes
-- **ALWAYS** update  when adding or changing operational procedures
+- **NEVER** run `terraform destroy` without explicit user confirmation in Telegram.
+- **NEVER** use `kubectl delete` on `argus-prod` namespace without explicit user confirmation.
+- **NEVER** commit secrets, tokens, `.env` files, or kubeconfig files.
+- **NEVER** push directly to `main` or `develop` — always open a PR.
+- **NEVER** change firewall rules or Doppler secrets without user escalation.
+- **ALWAYS** add `resources.requests` AND `resources.limits` to every pod spec.
+- **ALWAYS** run `terraform plan` and include the full diff in your PR description.
+- **ALWAYS** run `helm lint` before committing chart changes.
+- **ALWAYS** update `docs/setup.md` when adding or changing operational procedures.
 
 ## PR Format
-
+Every PR you open must include:
+- What changed and why (link to issue)
+- How to test
+- Any risks or migration steps
+- Checklist: tests passing, CLAUDE.md rules followed, no secrets committed
 
 ## Escalate to PM when
 - Any change to firewall rules or network policies
 - Any new secret being added to Doppler
-- Any change affecting  namespace
+- Any change affecting `argus-prod` namespace
 - Terraform state conflicts
 - Node failure or cluster health issues
+
+For detailed setup instructions, refer to `docs/setup.md`.
