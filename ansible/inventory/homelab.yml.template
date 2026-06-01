@@ -1,7 +1,7 @@
 ---
 # Argus homelab inventory template.
 # Copy this file to `homelab.yml` and fill in the IPs from your Terraform output.
-# Examplee:
+# Example:
 #   control_plane_ip  -> k8s-control
 #   worker_ips        -> k8s-worker-1, k8s-worker-2
 all:
