@@ -1,53 +1,73 @@
-# ArgoCD GitOps Bootstrap
+# Argus Infra Setup
 
-This document outlines the steps to set up ArgoCD on the Kubernetes cluster using a GitOps app-of-apps pattern.
+This document outlines the steps to set up the Argus Infrastructure repository.
 
 ## Prerequisites
 
-- A running Kubernetes cluster (e.g., provisioned by Terraform and Ansible).
-- kubectl controls the Kubernetes cluster manager.
+Before you begin, ensure you have the following installed:
 
--  environment variable set if your kubeconfig is not at .
+*   Git
+*   Terraform
+*   Ansible
+*   kubectl
+*   ArgoCD CLI
 
-## Steps
+You will also need:
 
-1.  **Provision VMs and Install k3s (if not already done)**
+*   A Kubernetes cluster (e.g., k3s, minikube, EKS, GKE)
+*   KUBECONFIG environment variable set if your kubeconfig is not at ~/.kube/config.
 
-    Refer to the `terraform` and `ansible` directories for instructions on provisioning VMs and installing k3s.
+## Getting Started
 
-2.  **Bootstrap ArgoCD**
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/fatoh2/argus-infra.git
+    cd argus-infra
+    ```
 
-    Manually bootstrap ArgoCD by running the following commands and set up the root app-of-apps.
+2.  Initialize Terraform:
+    ```bash
+    terraform init
+    ```
 
+3.  Apply Terraform configurations (e.g., to provision cloud resources):
+    ```bash
+    terraform apply
+    ```
 
-    Applying ArgoCD install manifests...
+4.  Run Ansible playbooks (e.g., to configure Kubernetes nodes):
+    ```bash
+    ansible-playbook -i inventory/hosts.ini playbooks/site.yml
+    ```
+
+5.  Install ArgoCD (if not already installed):
     ```bash
     kubectl create namespace argocd
     kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
     ```
 
-3.  **Retrieve ArgoCD Admin Password**
-
-    After the bootstrap script completes, it will print the command to retrieve the initial admin password. Run it:
+6.  Access ArgoCD UI:
     ```bash
-    kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+    argocd admin initial-password -n argocd
+    argocd port-forward
+    ```
+    Then navigate to `localhost:8080` in your browser.
+
+7.  Deploy ArgoCD Applications:
+    ```bash
+    kubectl apply -f k8s/argocd/apps/argocd-apps.yaml
     ```
 
-    
+## Development
 
-4.  **Access ArgoCD UI**
+### Running Sanity Checks
 
+To ensure your changes are valid, run the sanity checks:
 
-    Port-forward the ArgoCD server to access the UI:
-    ```bash
-    kubectl port-forward svc/argocd-server -n argocd 8080:443
-    ```
+```bash
+./scripts/run-sanity-checks.sh
+```
 
+### Contributing
 
-    
-
-
-## Next Steps
-
-- Add child application manifests to `argocd/apps` for your specific workloads (e.g., monitoring, databases, ingress, security).
-- Commit these changes to the `main` branch of the `argus-infra` repository. ArgoCD will automatically sync them.
+Please follow the [CONTRIBUTING.md](CONTRIBUTING.md) guidelines.
