@@ -54,6 +54,8 @@ This repository uses Infrastructure as Code (IaC) principles to provision and ma
 +---------------------+
 ```
 
+
+
 ## Getting Started
 
 To deploy a full Argus Infra cluster, please refer to the [Setup Guide](docs/setup.md). This guide will walk you through the prerequisites, Terraform provisioning, Ansible configuration, and ArgoCD bootstrapping.

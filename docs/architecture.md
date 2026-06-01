@@ -2,9 +2,6 @@
 
 This document provides an in-depth explanation of the Argus Infra components and their interactions, detailing the design choices and how they contribute to a robust and scalable Kubernetes homelab platform.
 
-## 1. Overall Architecture Diagram
-
-```mermaid
 graph TD
     subgraph Hetzner Cloud
         HCN[Hetzner Cloud Network] --> HCS[Hetzner Cloud Subnet]
