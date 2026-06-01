@@ -11,8 +11,10 @@ spec:
     path: k8s/monitoring
   destination:
     server: https://kubernetes.default.svc
-    namespace: argocd
+    namespace: monitoring # Target namespace for monitoring applications
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

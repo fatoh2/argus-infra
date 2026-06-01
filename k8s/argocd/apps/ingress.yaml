@@ -11,8 +11,10 @@ spec:
     path: k8s/ingress
   destination:
     server: https://kubernetes.default.svc
-    namespace: argocd
+    namespace: ingress # Target namespace for ingress applications
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

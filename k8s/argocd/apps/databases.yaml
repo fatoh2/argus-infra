@@ -11,8 +11,10 @@ spec:
     path: k8s/databases
   destination:
     server: https://kubernetes.default.svc
-    namespace: argocd
+    namespace: databases # Target namespace for database applications
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
