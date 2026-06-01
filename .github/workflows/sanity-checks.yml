@@ -1,0 +1,48 @@
+name: Sanity Checks
+
+on:
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  sanity-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.7
+
+      - name: Terraform Validate
+        run: |
+          cd terraform
+          terraform init
+          terraform validate
+
+      - name: Terraform Plan (no apply)
+        run: |
+          cd terraform
+          terraform plan -no-color
+
+      - name: Ansible Syntax Check
+        run: |
+          cd ansible
+          ansible-playbook --syntax-check playbooks/site.yml
+
+      # ArgoCD app health check, cluster sanity, and ingress reachability will require a running cluster
+      # For now, I'll add placeholders and note that these will need to be implemented once a cluster is available in CI or a test environment.
+      # These steps will likely involve setting up a k3s cluster in CI or connecting to a temporary test cluster.
+
+      - name: ArgoCD App Health Check (Placeholder)
+        run: echo "ArgoCD app health check requires a running cluster and ArgoCD CLI access."
+
+      - name: Cluster Sanity Check (Placeholder)
+        run: echo "Cluster sanity check requires kubectl access to a running cluster."
+
+      - name: Ingress Reachability Test (Placeholder)
+        run: echo "Ingress reachability test requires a running cluster with ingress and network access."
+
