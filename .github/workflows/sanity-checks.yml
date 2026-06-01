@@ -23,6 +23,11 @@ jobs:
           terraform init
           terraform validate
 
+      - name: Terraform Format Check
+        run: |
+          cd terraform/environments/homelab
+          terraform fmt -check
+
       - name: Terraform Plan (no apply)
         run: |
           cd terraform/environments/homelab
@@ -33,9 +38,14 @@ jobs:
           cd ansible
           ansible-playbook --syntax-check playbooks/site.yml
 
-      # ArgoCD app health check, cluster sanity, and ingress reachability will require a running cluster
-      # For now, I'll add placeholders and note that these will need to be implemented once a cluster is available in CI or a test environment.
-      # These steps will likely involve setting up a k3s cluster in CI or connecting to a temporary test cluster.
+      - name: Ansible Lint
+        run: |
+          pip install ansible-lint
+          ansible-lint ansible/playbooks/site.yml
+
+      # ArgoCD app health check, cluster sanity, and ingress reachability will require a running cluster.
+      # These steps are currently placeholders and will be implemented in a future iteration once a CI/test cluster is available.
+      # This will likely involve setting up a k3s cluster in CI or connecting to a temporary test cluster.
 
       - name: ArgoCD App Health Check (Placeholder)
         run: echo "ArgoCD app health check requires a running cluster and ArgoCD CLI access."
@@ -45,4 +55,3 @@ jobs:
 
       - name: Ingress Reachability Test (Placeholder)
         run: echo "Ingress reachability test requires a running cluster with ingress and network access."
-
