@@ -3,15 +3,20 @@ kind: ConfigMap
 metadata:
   name: argocd-cm
   namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
 data:
-  # url is the base URL for ArgoCD. This should be updated to your actual domain.
-  url: https://argocd.argus.example.com
-  # repositories is a list of Git repositories ArgoCD is allowed to access.
-  # For now, we'll allow the argus-infra repo.
-  repositories: |
-    - type: git
-      url: https://github.com/fatoh2/argus-infra.git
-  # accounts.admin.enabled: "false" can be used to disable the default admin user
-  # after other authentication methods are configured. For initial setup, keep enabled.
-  # Future: Integrate with SSO/OIDC.
-  # admin.enabled: "false"
+  # Disable anonymous access
+  users.anon.enabled: "false"
+  # Configure the default project to restrict deployments to the argocd namespace
+  # This is a basic example, more granular project definitions can be added.
+  # projects.argocd.io/default.spec: |
+  #   sourceRepos:
+  #   - '*'
+  #   destinations:
+  #   - namespace: argocd
+  #     server: https://kubernetes.default.svc
+  #   clusterResourceWhitelist:
+  #   - group: '*'
+  #     kind: '*'

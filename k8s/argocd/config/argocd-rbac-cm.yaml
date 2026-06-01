@@ -3,12 +3,19 @@ kind: ConfigMap
 metadata:
   name: argocd-rbac-cm
   namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-rbac-cm
+    app.kubernetes.io/part-of: argocd
 data:
-  # policy.csv defines the RBAC policies
-  # For a basic setup, we'll allow admin to do everything.
-  # Future: Restrict access based on projects and roles.
+  # Policy for restricting access to the argocd namespace
   policy.csv: |
-    p, role:admin, applications, *, */*, allow
+    p, role:admin, applications, *, argocd/*, allow
+    p, role:admin, clusters, *, *, allow
+    p, role:admin, repositories, *, *, allow
+    p, role:admin, projects, *, *, allow
+    p, role:admin, accounts, *, *, allow
+    p, role:admin, gpgkeys, *, *, allow
+    p, role:admin, certificates, *, *, allow
+    p, role:admin, exec, *, *, allow
     g, admin, role:admin
-  # policy.default provides the name of the role to use for unauthenticated users
   policy.default: role:readonly

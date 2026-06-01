@@ -23,9 +23,6 @@ kubectl apply -n argocd -f k8s/argocd/install.yaml || error_exit "Failed to appl
 log "Applying ArgoCD configuration"
 kubectl apply -n argocd -f k8s/argocd/config/argocd-rbac-cm.yaml || error_exit "Failed to apply ArgoCD RBAC config"
 kubectl apply -n argocd -f k8s/argocd/config/argocd-cm.yaml || error_exit "Failed to apply ArgoCD general config"
-log "Applying ArgoCD configuration"
-kubectl apply -n argocd -f k8s/argocd/config/argocd-rbac-cm.yaml || error_exit "Failed to apply ArgoCD RBAC config"
-kubectl apply -n argocd -f k8s/argocd/config/argocd-cm.yaml || error_exit "Failed to apply ArgoCD general config"
 
 log "Waiting for ArgoCD server to be ready"
 kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=300s || error_exit "ArgoCD server did not become ready within timeout"
