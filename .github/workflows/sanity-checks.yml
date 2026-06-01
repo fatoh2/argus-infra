@@ -55,15 +55,18 @@ jobs:
           python3 -m venv /tmp/ansible-lint-venv
           /tmp/ansible-lint-venv/bin/pip install ansible-lint
 
-      - name: Install Ansible Galaxy Collections
+      - name: Install Ansible Galaxy Collections (inside venv)
         run: |
-          ansible-galaxy collection install -r ansible/requirements.yml
+          # Install collections inside the venv so ansible-lint (which uses the
+          # venv's bundled ansible-core) can resolve modules like community.general.
+          /tmp/ansible-lint-venv/bin/ansible-galaxy collection install -r ansible/requirements.yml
 
       - name: Ansible Syntax Check
         run: |
           # Use homelab.ci.yml (CI-specific inventory with dummy IPs) instead of
           # homelab.yml (template with placeholders) to avoid parse failures.
-          ansible-playbook --syntax-check -i ansible/inventory/homelab.ci.yml ansible/playbooks/site.yml
+          /tmp/ansible-lint-venv/bin/ansible-playbook --syntax-check \
+            -i ansible/inventory/homelab.ci.yml ansible/playbooks/site.yml
 
       - name: Ansible Lint
         run: |
