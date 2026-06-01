@@ -1,29 +1,3 @@
-## Architecture Diagram (Conceptual)
+# Argus Infra Architecture
 
-```
-+---------------------+       +---------------------+
-| Hetzner Cloud       |       | GitHub              |
-|                     |       | (argus-infra repo)  |
-| +-----------------+ |       |                     |
-| | Private Network | |       | +-----------------+ |
-| | 10.0.1.0/24     | |       | | GitOps Repo     | |
-| |                 | |       | | (k8s manifests) | |
-| | +-------------+ | |       | +--------^--------+ |
-| | | k8s-control |<----+-----+----------|-----------+
-| | | (k3s server)| | |       |          | ArgoCD
-| | +-------------+ | |       |          | Sync
-| |       |         | |       |          v
-| | +-------------+ | |       | +-----------------+ |
-| | | k8s-worker-1|<----+-----+ | ArgoCD          | |
-| | | (k3s agent) | | |       | | (running in k8s)| |
-| | +-------------+ | |       | +-----------------+ |
-| |       |         | |       |                     |
-| | +-------------+ | |       |                     |
-| | | k8s-worker-2|<----+---------------------------+
-| | | (k3s agent) | | |
-| | +-------------+ | |
-| +-----------------+ |
-+---------------------+
-```
-
-## Getting Started
+This document provides an in-depth explanation of the Argus Infra components and their interactions. (Content to be added later)
