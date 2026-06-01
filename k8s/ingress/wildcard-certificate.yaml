@@ -1,0 +1,14 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-argus-infra-tls
+  namespace: ingress
+spec:
+  secretName: wildcard-argus-infra-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: "*.argus-infra.dev" # TODO: Replace with your actual cluster domain
+  dnsNames:
+    - "*.argus-infra.dev" # TODO: Replace with your actual cluster domain
+    - "argus-infra.dev" # TODO: Replace with your actual cluster domain

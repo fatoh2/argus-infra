@@ -1,0 +1,47 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    targetRevision: 45.x.x # Use a specific version
+    chart: kube-prometheus-stack
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    helm:
+      values: |
+        prometheus:
+          prometheusSpec:
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: local-path # Assuming local-path provisioner
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 50Gi
+        grafana:
+          persistence:
+            type: pvc
+            enabled: true
+            storageClassName: local-path # Assuming local-path provisioner
+            size: 10Gi
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            hosts:
+              - grafana.argus.dev # Replace with your domain
+            tls:
+              - hosts:
+                  - grafana.argus.dev # Replace with your domain
+                secretName: grafana-tls # Create this secret manually or via cert-manager

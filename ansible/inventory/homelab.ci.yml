@@ -1,0 +1,24 @@
+---
+# CI inventory for Ansible syntax and lint checks.
+# Uses dummy IPs that are valid for parsing but will never be reached.
+# In production, use homelab.yml (copied from homelab.yml.example) with real IPs.
+all:
+  vars:
+    ansible_user: root
+    ansible_ssh_private_key_file: ~/.ssh/argus_homelab
+    k3s_version: ""
+  children:
+    k3s_server:
+      hosts:
+        k8s-control:
+          ansible_host: 192.0.2.1
+    k3s_agent:
+      hosts:
+        k8s-worker-1:
+          ansible_host: 192.0.2.2
+        k8s-worker-2:
+          ansible_host: 192.0.2.3
+    k3s_cluster:
+      children:
+        k3s_server:
+        k3s_agent:

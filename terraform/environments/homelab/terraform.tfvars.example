@@ -1,13 +1,26 @@
 # Copy to terraform.tfvars and fill in real values.
 # terraform.tfvars is gitignored (only *.tfvars.example is committed).
 
+# === Required ===
+
 # Hetzner Cloud API token (Project > Security > API Tokens).
 hcloud_token = "REPLACE_WITH_YOUR_HCLOUD_API_TOKEN"
 
 # Name of an existing SSH key already uploaded to your Hetzner project.
 ssh_key_name = "argus-homelab"
 
-# Optional overrides (defaults shown).
-location    = "nbg1"
+# === Optional (defaults shown) ===
+
+# Hetzner Cloud location for all VMs.
+location = "nbg1"
+
+# Hetzner Cloud server type for all VMs.
 # server_type = "cx22"
-# image       = "ubuntu-24.04"
+
+# OS image for all VMs.
+# image = "ubuntu-24.04"
+
+# Numeric ID of the SSH key — bypasses the hcloud_ssh_key data source lookup.
+# Only needed for CI runs where the Hetzner API token is a dummy value.
+# In production, omit this and the key will be looked up by name automatically.
+# ssh_key_id = 0

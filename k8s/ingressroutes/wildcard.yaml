@@ -1,0 +1,16 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: wildcard
+  namespace: traefik # Assuming Traefik will be in the traefik namespace
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: 'Host()'
+      kind: Rule
+      services:
+        - name: dummy-service # This will be replaced by actual service routing
+          port: 80
+  tls:
+    secretName: wildcard-tls # Reference to the secret containing the wildcard certificate
