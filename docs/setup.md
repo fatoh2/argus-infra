@@ -74,16 +74,98 @@ Usage:
   kubectl [flags] [options]
 
 Use "kubectl <command> --help" for more information about a given command.
-Use "kubectl options" for a list of global command-line options (applies to all commands). configured to control your Kubernetes cluster.
+Use "kubectl options" for a list of global command-line options (applies to all commands). configured to control your Kubernetes cluster. Refer to the official [kubectl documentation](https://kubernetes.io/docs/reference/kubectl/) for more information.
 
 ## Steps
 
 1.  **Provision VMs and Install k3s**
 
     If you haven't already, provision your virtual machines using Terraform and install k3s using Ansible.
-    Refer to the  and  directories for detailed instructions.
+    Refer to the Usage: terraform [global options] <subcommand> [args]
 
-    Example (from the  directory):
+The available commands for execution are listed below.
+The primary workflow commands are given first, followed by
+less common or more advanced commands.
+
+Main commands:
+  init          Prepare your working directory for other commands
+  validate      Check whether the configuration is valid
+  plan          Show changes required by the current configuration
+  apply         Create or update infrastructure
+  destroy       Destroy previously-created infrastructure
+
+All other commands:
+  console       Try Terraform expressions at an interactive command prompt
+  fmt           Reformat your configuration in the standard style
+  force-unlock  Release a stuck lock on the current workspace
+  get           Install or upgrade remote Terraform modules
+  graph         Generate a Graphviz graph of the steps in an operation
+  import        Associate existing infrastructure with a Terraform resource
+  login         Obtain and save credentials for a remote host
+  logout        Remove locally-stored credentials for a remote host
+  metadata      Metadata related commands
+  modules       Show all declared modules in a working directory
+  output        Show output values from your root module
+  providers     Show the providers required for this configuration
+  query         Search and list remote infrastructure with Terraform
+  refresh       Update the state to match remote systems
+  show          Show the current state or a saved plan
+  stacks        Manage HCP Terraform stack operations
+  state         Advanced state management
+  taint         Mark a resource instance as not fully functional
+  test          Execute integration tests for Terraform modules
+  untaint       Remove the 'tainted' state from a resource instance
+  version       Show the current Terraform version
+  workspace     Workspace management
+
+Global options (use these before the subcommand, if any):
+  -chdir=DIR    Switch to a different working directory before executing the
+                given subcommand.
+  -help         Show this help output or the help for a specified subcommand.
+  -version      An alias for the "version" subcommand. and  directories for detailed instructions.
+
+    Example (from the Usage: terraform [global options] <subcommand> [args]
+
+The available commands for execution are listed below.
+The primary workflow commands are given first, followed by
+less common or more advanced commands.
+
+Main commands:
+  init          Prepare your working directory for other commands
+  validate      Check whether the configuration is valid
+  plan          Show changes required by the current configuration
+  apply         Create or update infrastructure
+  destroy       Destroy previously-created infrastructure
+
+All other commands:
+  console       Try Terraform expressions at an interactive command prompt
+  fmt           Reformat your configuration in the standard style
+  force-unlock  Release a stuck lock on the current workspace
+  get           Install or upgrade remote Terraform modules
+  graph         Generate a Graphviz graph of the steps in an operation
+  import        Associate existing infrastructure with a Terraform resource
+  login         Obtain and save credentials for a remote host
+  logout        Remove locally-stored credentials for a remote host
+  metadata      Metadata related commands
+  modules       Show all declared modules in a working directory
+  output        Show output values from your root module
+  providers     Show the providers required for this configuration
+  query         Search and list remote infrastructure with Terraform
+  refresh       Update the state to match remote systems
+  show          Show the current state or a saved plan
+  stacks        Manage HCP Terraform stack operations
+  state         Advanced state management
+  taint         Mark a resource instance as not fully functional
+  test          Execute integration tests for Terraform modules
+  untaint       Remove the 'tainted' state from a resource instance
+  version       Show the current Terraform version
+  workspace     Workspace management
+
+Global options (use these before the subcommand, if any):
+  -chdir=DIR    Switch to a different working directory before executing the
+                given subcommand.
+  -help         Show this help output or the help for a specified subcommand.
+  -version      An alias for the "version" subcommand. directory):
     [0m[1mTerraform initialized in an empty directory![0m
 
 The directory has no Terraform configuration files. You may begin working
@@ -98,7 +180,7 @@ with Terraform immediately by creating Terraform configuration files.[0m
     This will apply the necessary manifests to your Kubernetes cluster.
 
     ArgoCD admin password command:
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{".data.password"}" | base64 -d; echo
+    
 
 3.  **Retrieve ArgoCD Admin Password**
 
