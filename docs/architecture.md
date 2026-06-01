@@ -12,7 +12,8 @@ Argus Infra is a fully GitOps-driven Kubernetes homelab platform running on Hetz
 4. **Ingress & TLS** — Traefik + cert-manager for routing and automatic certificates
 5. **Observability** — Prometheus, Grafana, and Loki for metrics and logs
 6. **Secrets** — External Secrets Operator with Doppler for secure credential management
-7. **CI/CD & Testing** — GitHub Actions for validation, sanity checks, and cluster health monitoring
+7. **Security** — Kubernetes NetworkPolicies for least-privilege pod network access
+8. **CI/CD & Testing** — GitHub Actions for validation, sanity checks, and cluster health monitoring
 
 ## 2. Infrastructure Provisioning (Terraform/OpenTofu)
 
@@ -73,25 +74,27 @@ The ArgoCD app-of-apps structure is defined in `k8s/argocd/apps/`:
 | `promtail` | Helm chart (grafana/promtail) | `monitoring` | Log collection agent |
 | `traefik` | Helm chart (traefik/traefik) | `traefik` | Ingress controller |
 | `cert-manager` | Helm chart (jetstack/cert-manager) | `cert-manager` | TLS certificate automation |
+| `security` | `k8s/security/network-policies/` | `default` | NetworkPolicies (default deny + explicit allow) |
 
-## 6. Secrets Management (External Secrets Operator & Doppler)
+## 6. Secret Management (External Secrets Operator)
 
-Sensitive information (e.g., API keys, database credentials) is managed through a secure, external secrets management system. This approach ensures that secrets are never stored in the Git repository.
+Secrets are managed securely using External Secrets Operator (ESO) with Doppler as the external secrets provider. This approach ensures that sensitive credentials are never stored in Git and are dynamically injected into the cluster.
 
 ### Key Components:
-- **External Secrets Operator:** A Kubernetes operator that synchronizes secrets from external providers (like Doppler) into Kubernetes Secrets.
-- **Doppler:** A cloud-based secrets management platform that serves as the single source of truth for all sensitive configuration data.
-- **ClusterSecretStore:** A cluster-scoped resource that defines how to connect to the external secrets provider (Doppler). It is configured once and used by all ExternalSecrets across namespaces.
+- **External Secrets Operator:** A Kubernetes operator that synchronizes secrets from external APIs (Doppler) into Kubernetes Secrets.
+- **Doppler:** A cloud-based secrets management platform that provides a centralized, auditable, and encrypted store for all environment variables and secrets.
+- **SecretStore:** A namespaced or cluster-scoped ESO resource that defines how to authenticate and connect to the external secrets provider (Doppler).
+- **ExternalSecret:** A namespaced ESO resource that declares which secrets to fetch from the external provider and how to map them into a Kubernetes Secret.
 
 ### Workflow:
-1. Secrets are defined and managed in the Doppler dashboard.
-2. External Secrets Operator, configured via a `ClusterSecretStore`, periodically fetches the required secrets from Doppler.
-3. The operator creates or updates native Kubernetes `Secret` objects in the specified namespaces.
-4. Pods access these secrets as environment variables or volume mounts, just like any other Kubernetes secret.
+1. A `SecretStore` is configured with a Doppler API token (stored as a Kubernetes Secret, bootstrapped manually).
+2. An `ExternalSecret` resource references the `SecretStore` and specifies which Doppler secrets to fetch.
+3. ESO periodically syncs the specified secrets from Doppler and creates/updates the corresponding Kubernetes `Secret`.
+4. Application pods reference the Kubernetes `Secret` as environment variables or volume mounts.
 
-## 7. Ingress and TLS (Traefik & cert-manager)
+## 7. Ingress & TLS (Traefik + cert-manager)
 
-Traefik serves as the ingress controller, managing external access to services running in the cluster. cert-manager automates the lifecycle of TLS certificates from Let's Encrypt.
+Traefik serves as the ingress controller, routing external HTTP/HTTPS traffic to internal services. cert-manager automates TLS certificate provisioning and renewal using Let's Encrypt.
 
 ### Key Components:
 - **Traefik:** A modern, cloud-native HTTP reverse proxy and load balancer. It handles ingress routing based on `IngressRoute` (Traefik's CRD) or standard Kubernetes `Ingress` resources.
@@ -122,7 +125,43 @@ A comprehensive observability stack provides metrics collection, visualization, 
 - **Loki:** A horizontally-scalable, highly-available log aggregation system. It indexes metadata (labels) rather than full-text, making it cost-effective.
 - **Promtail:** A log collector that runs on each node, shipping container logs to Loki.
 
-## 9. CI/CD Pipeline & Testing
+## 9. Security (Kubernetes NetworkPolicies)
+
+Argus Infra enforces least-privilege network access between pods using Kubernetes NetworkPolicies. A **default-deny** approach is applied to all namespaces, with explicit allow rules for legitimate traffic flows.
+
+### Default Deny
+
+A `default-deny-all` NetworkPolicy is applied to the following namespaces, blocking all ingress and egress traffic by default:
+
+- `databases`
+- `default`
+- `monitoring`
+- `ingress`
+- `traefik`
+- `cert-manager`
+- `external-secrets-operator`
+- `argocd`
+
+### Explicit Allow Rules
+
+| Policy | Namespace | Source | Destination | Port | Purpose |
+|--------|-----------|--------|-------------|------|---------|
+| `allow-api-to-postgres` | databases | `api-service` (label) | `postgres` (pod) | TCP 5432 | Application database access |
+| `allow-api-to-redis` | databases | `api-service` (label) | `redis` (pod) | TCP 6379 | Application cache access |
+| `allow-solana-adapter-egress` | default | `solana-adapter` (label) | Internet (HTTPS) | TCP 443 | Blockchain RPC calls (RFC1918 excluded) |
+| `allow-ingress-to-api` | default | `ingress` namespace | `api-service` (pod) | TCP 3000 | Ingress to application traffic |
+
+### Deployment
+
+NetworkPolicies are deployed via ArgoCD as part of the `security` application, which sources from `k8s/security/network-policies/`. The app-of-apps root application includes `security` in its list of child applications.
+
+### Risks & Considerations
+
+- Applying default-deny to the `argocd` namespace may interfere with ArgoCD's ability to sync applications across namespaces. Monitor after deployment.
+- Policies are label-based and will only take effect when pods with matching labels are deployed. Pre-created policies for future services (e.g., `solana-adapter`, `api-service`) are harmless until those pods exist.
+- NetworkPolicies require a CNI plugin that supports them (k3s uses Flannel by default, which does not enforce NetworkPolicies). For enforcement, install a CNI like Calico or Cilium.
+
+## 10. CI/CD Pipeline & Testing
 
 Argus Infra uses GitHub Actions for continuous integration and cluster health monitoring. The pipeline is designed to catch issues early and ensure cluster reliability.
 
@@ -162,7 +201,7 @@ The `scripts/` directory contains scripts that replicate the CI checks locally:
 
 Run `./scripts/run-sanity-checks.sh` before committing to catch issues early.
 
-## 10. Data Flow Summary
+## 11. Data Flow Summary
 
 ```
 User commits to Git
@@ -183,10 +222,11 @@ User commits to Git
        ├──► Application Pods
        ├──► Prometheus (metrics)
        ├──► Loki (logs)
-       └──► External Secrets (Doppler)
+       ├──► External Secrets (Doppler)
+       └──► NetworkPolicies (default deny, least-privilege)
 ```
 
-## 11. Design Decisions
+## 12. Design Decisions
 
 Key architecture decisions are documented as Architecture Decision Records (ADRs) in `docs/adr/`:
 
