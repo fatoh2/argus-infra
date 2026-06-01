@@ -15,7 +15,7 @@ Ensure the `KUBECONFIG` environment variable is set if your kubeconfig file is n
 
 1.  **Provision VMs and Install k3s (if not already done)**
 
-    Refer to the `terraform` and `ansible` directories for instructions on provisioning VMs and installing k3s.
+    Refer to the `terraform` directory for VM provisioning (e.g., `cd terraform/hetzner && terraform apply`) and the `ansible` directory for k3s installation (e.g., `cd ansible/k3s && ansible-playbook site.yaml`).
 
 2.  **Bootstrap ArgoCD**
 
@@ -24,7 +24,17 @@ Ensure the `KUBECONFIG` environment variable is set if your kubeconfig file is n
     Applying ArgoCD install manifests...
     ```bash
     kubectl create namespace argocd
-    kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+    kubectl apply -n argocd -f k8s/argocd/install.yaml
+    ```
+    Wait for ArgoCD pods to be ready:
+    ```bash
+    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n argocd --timeout=300s
+    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-repo-server -n argocd --timeout=300s
+    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-application-controller -n argocd --timeout=300s
+    ```
+    Apply the root app-of-apps manifest:
+    ```bash
+    kubectl apply -n argocd -f k8s/argocd/app-of-apps.yaml
     ```
 
 3.  **Retrieve ArgoCD Admin Password**
@@ -34,18 +44,12 @@ Ensure the `KUBECONFIG` environment variable is set if your kubeconfig file is n
     kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
     ```
 
-    
-
 4.  **Access ArgoCD UI**
 
     Port-forward the ArgoCD server to access the UI:
     ```bash
-    kubectl port-forward svc/argocd-server -n argocd 8080:80 # Assuming HTTP on port 80. Adjust if using HTTPS on 443.
+    kubectl port-forward svc/argocd-server -n argocd 8080:443 # Access via HTTPS on port 8080
     ```
-
-
-    
-
 
 ## Next Steps
 
