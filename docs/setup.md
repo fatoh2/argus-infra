@@ -230,7 +230,90 @@ ArgoCD applications are defined in the `argocd/apps/` directory. To deploy them,
    kubectl apply -f argocd/apps/<app-name>/application.yaml
    ```
 
-## 5. CI Workflow
+
+## 5. Deploy Cluster Applications via ArgoCD
+
+Once ArgoCD is bootstrapped, deploy the cluster infrastructure applications. These are defined as ArgoCD Application manifests in `k8s/argocd/apps/` and can be applied in dependency order.
+
+### 5.1 Ingress Stack (Traefik + cert-manager + TLS)
+
+The ingress stack provides external routing and automatic TLS certificates:
+
+```bash
+# Create the ingress namespace
+kubectl create namespace ingress
+
+# Deploy the ingress application (manages Traefik, cert-manager, and wildcard cert)
+kubectl apply -f k8s/argocd/apps/ingress.yaml
+```
+
+This deploys:
+- **Traefik** — ingress controller with HTTP→HTTPS redirect (NodePorts 30080/30443)
+- **cert-manager** — automatic TLS certificate management
+- **ClusterIssuer** — Let's Encrypt production issuer
+- **Wildcard certificate** — `*.argus-infra.dev` TLS certificate
+
+> **Note:** Before the wildcard certificate provisions, update the domain and email placeholders in `k8s/ingress/wildcard-certificate.yaml` and `k8s/ingress/cluster-issuer.yaml` to match your actual domain.
+
+### 5.2 Monitoring Stack (Prometheus + Grafana)
+
+Deploy the monitoring stack for cluster metrics and visualization:
+
+```bash
+# Create the monitoring namespace
+kubectl create namespace monitoring
+
+# Deploy Prometheus via the monitoring app-of-apps
+kubectl apply -f k8s/argocd/apps/monitoring.yaml
+
+# Deploy Grafana (dashboards and provisioning)
+kubectl apply -f k8s/argocd/apps/grafana.yaml
+```
+
+This deploys:
+- **kube-prometheus-stack** — Prometheus, Alertmanager, node exporters, service monitors
+- **Grafana** — pre-configured with dashboards and Prometheus datasource
+
+### 5.3 Logging Stack (Loki + Promtail)
+
+Deploy centralized log aggregation:
+
+```bash
+# Deploy Loki
+kubectl apply -f k8s/argocd/apps/loki/application.yaml
+
+# Deploy Promtail (DaemonSet for log collection)
+kubectl apply -f k8s/argocd/apps/loki/promtail.yaml
+```
+
+This deploys:
+- **Loki** — log aggregation system with persistent storage
+- **Promtail** — log collection agent running on every node
+
+### 5.4 Verify Deployments
+
+Check that all applications are synced in ArgoCD:
+
+```bash
+argocd app list
+```
+
+Or via kubectl:
+
+```bash
+kubectl get applications -n argocd
+```
+
+Wait for all pods to be ready:
+
+```bash
+kubectl -n ingress get pods
+kubectl -n monitoring get pods
+kubectl -n traefik get pods
+kubectl -n cert-manager get pods
+```
+
+## 6. CI Workflow
 
 The repository includes a GitHub Actions workflow (`.github/workflows/sanity-checks.yml`) that runs on every PR to `develop`. It performs:
 
@@ -241,5 +324,4 @@ The repository includes a GitHub Actions workflow (`.github/workflows/sanity-che
 - **Ansible lint** — lints all playbooks and roles for best practices
 
 > **CI implementation detail:** Ansible steps run inside a dedicated Python virtual environment (`/tmp/ansible-lint-venv`). Ansible Galaxy collections are installed using the venv's `ansible-galaxy` so that `ansible-lint` (which uses the venv's bundled `ansible-core`) can resolve modules like `community.general`. The syntax check also uses the venv's `ansible-playbook` for consistency. This avoids "couldn't resolve module/action" errors.
-
 > **Note:** The Terraform plan step uses dummy values for `hcloud_token`, `ssh_key_name`, `ssh_key_id`, `location`, `server_type`, and `image`. These are for syntax validation only. In a real deployment, these variables are populated from `terraform.tfvars` or CI secrets.
