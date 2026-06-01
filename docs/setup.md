@@ -16,37 +16,61 @@ You will also need:
 
 *   A Kubernetes cluster (e.g., k3s, minikube, EKS, GKE)
 *   KUBECONFIG environment variable set if your kubeconfig is not at ~/.kube/config.
+    Example: `export KUBECONFIG=/path/to/your/kubeconfig`
 
 ## Getting Started
 
 1.  Clone the repository:
-    
+    ```bash
+    git clone git@github.com:fatoh2/argus-infra.git
+    cd argus-infra
+    ```
 
 2.  Initialize Terraform:
-    [0m[1mTerraform initialized in an empty directory![0m
-
-The directory has no Terraform configuration files. You may begin working
-with Terraform immediately by creating Terraform configuration files.[0m
+    ```bash
+    cd terraform/environments/homelab
+    terraform init
+    cd ../../.. # Go back to root
+    ```
 
 3.  Apply Terraform configurations (e.g., to provision cloud resources):
-    
+    ```bash
+    cd terraform/environments/homelab
+    terraform apply
+    cd ../../.. # Go back to root
+    ```
 
 4.  Prepare Ansible inventory:
-    
+    ```bash
+    cp ansible/inventory/homelab.yml.example ansible/inventory/homelab.yml
+    # Edit ansible/inventory/homelab.yml with your host details
+    ```
 
 5.  Run Ansible playbooks (e.g., to configure Kubernetes nodes):
-    
+    ```bash
+    ansible-galaxy install -r ansible/requirements.yml
+    ansible-playbook -i ansible/inventory/homelab.yml ansible/playbooks/site.yml
+    ```
 
 6.  Install ArgoCD (if not already installed):
-    
+    ```bash
+    kubectl create namespace argocd
+    kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+    ```
 
 7.  Access ArgoCD UI:
-    
-    Then navigate to  in your browser.
+    ```bash
+    argocd admin initial-password -n argocd
+    # Port forward the ArgoCD server:
+    kubectl port-forward svc/argocd-server -n argocd 8080:443
+    ```
+    Then navigate to `https://localhost:8080` in your browser.
 
 8.  Deploy ArgoCD Applications:
-    
-    *Note: The ArgoCD applications are configured with , which means namespaces like  and  will be automatically created.*
+    ```bash
+    kubectl apply -f k8s/argocd/app-of-apps.yaml
+    # Note: The ArgoCD applications are configured with `selfHeal: true`, which means namespaces like `databases` and `ingress` will be automatically created.
+    ```
 
 ## Development
 
@@ -54,7 +78,10 @@ with Terraform immediately by creating Terraform configuration files.[0m
 
 To ensure your changes are valid, run the sanity checks:
 
-
+```bash
+.github/workflows/sanity-checks.yml
+```
+*Note: This is a GitHub Actions workflow. You would typically push your changes and let GitHub Actions run it. For local testing, you can use `act` or manually run the commands within the workflow file.*
 
 ### Contributing
 
