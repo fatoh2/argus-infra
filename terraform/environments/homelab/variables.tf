@@ -9,6 +9,12 @@ variable "ssh_key_name" {
   type        = string
 }
 
+variable "ssh_key_id" {
+  description = "Numeric ID of the SSH key (optional, bypasses API lookup for CI)."
+  type        = number
+  default     = null
+}
+
 variable "location" {
   description = "Hetzner Cloud location for all VMs."
   type        = string

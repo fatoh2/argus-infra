@@ -1,0 +1,50 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: traefik
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://helm.traefik.io/traefik
+    chart: traefik
+    targetRevision: 25.0.0 # Use a specific version
+    helm:
+      values: |
+        ports:
+          web:
+            nodePort: 30080
+          websecure:
+            nodePort: 30443
+        additionalArguments:
+          - --certificatesresolvers.myresolver.acme.email=fatoh.dev@gmail.com
+          - --certificatesresolvers.myresolver.acme.storage=/data/acme.json
+          - --certificatesresolvers.myresolver.acme.tlschallenge=true
+        ingressClassResource:
+          enabled: true
+          default: true
+          create: true
+          # This is important for cert-manager to work with Traefik
+          # See: https://cert-manager.io/docs/usage/ingress/#configuring-cert-manager-with-ingress-controllers
+          # We will configure cert-manager later to use this ingress class
+          # For now, we set it to true to ensure Traefik creates it.
+          # We will set the name to 'traefik' to match the ingress controller name.
+          name: traefik
+        logs:
+          level: INFO
+        # Enable Traefik dashboard
+        dashboard:
+          enabled: true
+          insecure: true # Access dashboard via http://<traefik-host>:30080/dashboard
+        # Enable Traefik CRDs
+        crd:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: traefik
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

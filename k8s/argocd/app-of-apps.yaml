@@ -10,10 +10,8 @@ spec:
   project: default
   source:
     path: k8s/argocd/apps
-    repoURL: https://github.com/fatoh2/argus-infra # NOTE: Hardcoded for initial setup. Consider templating for advanced use cases.
-    # NOTE: repoURL is hardcoded for initial setup. Consider using parameters or config management for dynamic environments.
-    # For more information, refer to: https://argo-cd.readthedocs.io/en/stable/user-guide/parameters/
-    targetRevision: HEAD # NOTE: Ensure robust CI/CD practices for the main branch as changes will be automatically synced.
+    repoURL: https://github.com/fatoh2/argus-infra
+    targetRevision: main
   syncPolicy:
     automated:
       prune: true

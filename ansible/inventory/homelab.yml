@@ -6,10 +6,7 @@
 all:
   vars:
     ansible_user: root
-    # Path to the SSH private key for connecting to Hetzner VMs.
-    # Generate one with: ssh-keygen -t ed25519 -f ~/.ssh/argus_homelab -N ""
-    # Then upload the public key to your Hetzner Cloud project.
-    ansible_ssh_private_key_file: ~/.ssh/argus_homelab
+    # ansible_ssh_private_key_file: ~/.ssh/argus_homelab
     # k3s version for all nodes ("" = latest stable)
     k3s_version: ""
   children:
