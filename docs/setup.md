@@ -15,7 +15,7 @@ Ensure the `KUBECONFIG` environment variable is set if your kubeconfig file is n
 
 1.  **Provision VMs and Install k3s (if not already done)**
 
-    Refer to the `terraform` directory for VM provisioning (e.g., `cd terraform/hetzner && terraform apply`) and the `ansible` directory for k3s installation (e.g., `cd ansible/k3s && ansible-playbook site.yaml`).
+    Refer to the `terraform` directory for VM provisioning (e.g., `cd terraform/hetzner Refer to the `terraform` directory for VM provisioning (e.g., `cd terraform/hetzner && terraform apply`) and the `ansible` directory for k3s installation (e.g., `cd ansible/k3s && ansible-playbook site.yaml`).Refer to the `terraform` directory for VM provisioning (e.g., `cd terraform/hetzner && terraform apply`) and the `ansible` directory for k3s installation (e.g., `cd ansible/k3s && ansible-playbook site.yaml`). terraform apply` to create VMs) and the `ansible` directory for k3s installation (e.g., `cd ansible/k3s Refer to the `terraform` directory for VM provisioning (e.g., `cd terraform/hetzner && terraform apply`) and the `ansible` directory for k3s installation (e.g., `cd ansible/k3s && ansible-playbook site.yaml`).Refer to the `terraform` directory for VM provisioning (e.g., `cd terraform/hetzner && terraform apply`) and the `ansible` directory for k3s installation (e.g., `cd ansible/k3s && ansible-playbook site.yaml`). ansible-playbook site.yaml` to install k3s on the provisioned VMs).
 
 2.  **Bootstrap ArgoCD**
 
