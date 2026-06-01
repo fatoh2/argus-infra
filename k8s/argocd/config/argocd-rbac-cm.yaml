@@ -4,9 +4,11 @@ metadata:
   name: argocd-rbac-cm
   namespace: argocd
 data:
-  # Policy for restricting access to the argocd namespace
+  # policy.csv defines the RBAC policies
+  # For a basic setup, we'll allow admin to do everything.
+  # Future: Restrict access based on projects and roles.
   policy.csv: |
-    p, role:admin, applications, *, argocd/*, allow
-    p, role:readonly, applications, get, */*, allow
+    p, role:admin, applications, *, */*, allow
     g, admin, role:admin
+  # policy.default provides the name of the role to use for unauthenticated users
   policy.default: role:readonly

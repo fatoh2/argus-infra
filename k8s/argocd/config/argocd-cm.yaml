@@ -4,25 +4,14 @@ metadata:
   name: argocd-cm
   namespace: argocd
 data:
-  # Disable anonymous access
-  oidc.config: |
-    {
-      "name": "Argocd",
-      "issuer": "https://accounts.google.com",
-      "clientID": "{{.sso.clientID}}",
-      "clientSecret": "{{.sso.clientSecret}}",
-      "requestedScopes": ["email", "profile", "groups"]
-    }
-  # Enable server-side logging
-  server.log.level: "info"
-  # Enable server-side logging format
-  server.log.format: "text"
-  # Enable UI settings
-  ui.workflows.enabled: "true"
-  ui.checksum.enabled: "true"
-  ui.notifications.enabled: "true"
-  # Enable SSO configuration (example, needs actual values)
-  # sso.provider: "google"
-  # sso.clientID: "YOUR_CLIENT_ID"
-  # sso.clientSecret: "YOUR_CLIENT_SECRET"
-  # sso.hostedDomains: "example.com"
+  # url is the base URL for ArgoCD. This should be updated to your actual domain.
+  url: https://argocd.argus.example.com
+  # repositories is a list of Git repositories ArgoCD is allowed to access.
+  # For now, we'll allow the argus-infra repo.
+  repositories: |
+    - type: git
+      url: https://github.com/fatoh2/argus-infra.git
+  # accounts.admin.enabled: "false" can be used to disable the default admin user
+  # after other authentication methods are configured. For initial setup, keep enabled.
+  # Future: Integrate with SSO/OIDC.
+  # admin.enabled: "false"
