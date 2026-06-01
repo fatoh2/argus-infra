@@ -1,0 +1,28 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: traefik
+  namespace: ingress
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: traefik
+      sourceRef:
+        kind: HelmRepository
+        name: traefik
+        namespace: flux-system
+      version: "20.x.x" # Use a specific version, e.g., "20.10.1"
+  values:
+    ports:
+      web:
+        redirectTo: websecure
+      websecure:
+        tls:
+          enabled: true
+    providers:
+      kubernetesIngress:
+        enabled: true
+        publishedService:
+          enabled: true
+    # Add any other Traefik specific configurations here
