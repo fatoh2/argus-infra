@@ -1,3 +1,1 @@
-# Argus Infra Architecture
-
-This document provides an in-depth explanation of the Argus Infra components and their interactions. (Content to be added later)
+# Argus Infra Architecture\n\nThis document provides an in-depth explanation of the Argus Infra components and their interactions. It will contain detailed diagrams, component breakdowns, and data flows.
