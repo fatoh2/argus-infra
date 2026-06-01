@@ -1,0 +1,6 @@
+  - name: traefik
+    namespace: argocd
+    project: default
+  - name: cert-manager
+    namespace: argocd
+    project: default
