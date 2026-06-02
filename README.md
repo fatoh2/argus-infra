@@ -2,7 +2,6 @@
 
 [![Sanity Checks](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml)
 [![Cluster Sanity](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml)
-[![Cluster Sanity](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml)
 
 **A production-grade Kubernetes homelab platform on Hetzner Cloud** — provisioned with Terraform, configured with Ansible, and managed via GitOps with ArgoCD.
 
@@ -18,8 +17,6 @@ Argus Infra provides a complete, reproducible Kubernetes cluster running on Hetz
 | **Ingress** | Traefik + cert-manager | HTTP routing, automatic TLS via Let's Encrypt |
 | **Monitoring** | Prometheus + Grafana + Loki | Metrics, dashboards, log aggregation |
 | **Secrets** | External Secrets Operator + Doppler | Secure secret injection |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |
-| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
 | **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |
 | **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
 
@@ -65,10 +62,6 @@ argus-infra/
 │   │   ├── network-policies/  # Default deny + explicit allow rules
 │   │   ├── pod-security/      # Pod Security Standards (restricted profile)
 │   │   └── rbac/              # Least-privilege ServiceAccounts
-│   ├── security/           # Security policies
-│   │   ├── network-policies/  # Default deny + explicit allow rules
-│   │   ├── pod-security/      # Pod Security Standards (restricted profile)
-│   │   └── rbac/              # Least-privilege ServiceAccounts
 │   └── cluster-issuer/     # Let's Encrypt ClusterIssuers
 ├── scripts/                # Operational and CI scripts
 │   ├── run-sanity-checks.sh   # Local sanity suite (Terraform, Ansible, ArgoCD)
@@ -78,13 +71,7 @@ argus-infra/
 │   ├── architecture.md     # System architecture
 │   ├── setup.md            # Setup guide
 │   └── adr/                # Architecture Decision Records
-├── scripts/                # Operational and CI scripts
-│   ├── run-sanity-checks.sh   # Local sanity suite (Terraform, Ansible, ArgoCD)
-│   ├── argocd-health.sh       # ArgoCD app health check
-│   └── cluster-sanity.sh      # Full cluster-level sanity checks
 └── .github/workflows/      # CI pipeline
-    ├── sanity-checks.yml   # PR-level Terraform + Ansible validation
-    └── cluster-sanity.yml  # Cluster-level health checks (scheduled)
     ├── sanity-checks.yml   # PR-level Terraform + Ansible validation
     └── cluster-sanity.yml  # Cluster-level health checks (scheduled)
 ```
@@ -95,9 +82,6 @@ argus-infra/
 - **Automatic TLS** — wildcard certificate via Let's Encrypt + cert-manager
 - **Observability out of the box** — Prometheus metrics, Grafana dashboards, Loki logs
 - **Secure by default** — External Secrets Operator for secrets, private network for nodes
-- **Network Policies** — default-deny on all namespaces with explicit allow rules for least-privilege pod communication
-- **Pod Security Standards** — restricted profile enforced on all namespaces; workloads configured with `runAsNonRoot`, `readOnlyRootFilesystem`, and dropped capabilities
-- **Least-Privilege RBAC** — dedicated ServiceAccounts for each service with minimum required permissions; `api-service` has zero k8s API access
 - **Network Policies** — default-deny on all namespaces with explicit allow rules for least-privilege pod communication
 - **Pod Security Standards** — restricted profile enforced on all namespaces; workloads configured with `runAsNonRoot`, `readOnlyRootFilesystem`, and dropped capabilities
 - **Least-Privilege RBAC** — dedicated ServiceAccounts for each service with minimum required permissions; `api-service` has zero k8s API access
