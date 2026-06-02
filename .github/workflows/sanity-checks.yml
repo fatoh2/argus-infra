@@ -37,6 +37,10 @@ jobs:
           terraform fmt -check -recursive
 
       - name: Terraform Plan (no apply)
+        # NOTE: This runs on PRs from forks where secrets are unavailable.
+        # We use a dummy token and -backend=false to validate configuration
+        # syntax without making real API calls. The actual plan with real
+        # credentials runs in cd-deploy.yml (main branch only).
         run: |
           cd terraform/environments/homelab
           # Initialize without backend to avoid needing cloud credentials in CI.
@@ -74,7 +78,7 @@ jobs:
           /tmp/ansible-venv/bin/ansible-lint ansible/playbooks/ ansible/roles/
 
       - name: Script Syntax Check (ShellCheck)
-        uses: ludeeus/action-shellcheck@master
+        uses: ludeeus/action-shellcheck@2.0.0
         with:
           scandir: ./scripts
           severity: warning
