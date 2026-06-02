@@ -24,12 +24,29 @@ env:
   CLUSTER_SANITY_ENABLED: ${{ vars.CLUSTER_SANITY_ENABLED || 'false' }}
 
 jobs:
-  cluster-sanity:
+  # Gate job: always runs and always succeeds. Outputs whether sanity checks
+  # are enabled. This prevents the workflow from being marked as failed when
+  # all downstream jobs are skipped (e.g. when CLUSTER_SANITY_ENABLED is false).
+  gate:
     runs-on: ubuntu-latest
-    # Only run if the repository variable CLUSTER_SANITY_ENABLED is set to 'true'.
-    # This prevents the workflow from failing in forks or PRs without cluster access.
-    # Repository variables ARE accessible in if: conditions (unlike secrets).
-    if: env.CLUSTER_SANITY_ENABLED == 'true'
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        run: |
+          if [ "$CLUSTER_SANITY_ENABLED" = "true" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Cluster sanity checks are disabled. Set CLUSTER_SANITY_ENABLED=true in repo variables to enable."
+          fi
+        env:
+          CLUSTER_SANITY_ENABLED: ${{ env.CLUSTER_SANITY_ENABLED }}
+
+  cluster-sanity:
+    needs: gate
+    if: needs.gate.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
