@@ -1,6 +1,6 @@
 # Argus Infra Setup
 
-This document outlines the steps to set up the Argus Infrastructure repository — a Kubernetes homelab platform on Hetzner Cloud (k3s), GCP Compute Engine (single VM), or GCP GKE (managed Kubernetes) using Terraform, Ansible, and ArgoCD.
+This document outlines the steps to set up the Argus Infrastructure repository — a Kubernetes homelab platform on Hetzner Cloud (k3s), GCP Compute Engine (single VM), GCP GKE (managed Kubernetes), or AWS EC2 (single VM) using Terraform, Ansible, and ArgoCD.
 
 ## Prerequisites
 
@@ -9,6 +9,7 @@ Before you begin, ensure you have the following:
 - **Git** — for cloning the repository
 - **Hetzner Cloud API Token** — create one in your Hetzner Cloud project under **Security > API Tokens**
 - **Google Cloud Platform account** — with billing enabled (required for GCP deployments)
+- **AWS account** — with billing enabled and AWS credentials configured (required for AWS deployments)
 - **CLI tools** — install all required tools with one command (see below)
 
 ### Automated Tool Installation
@@ -449,3 +450,67 @@ terraform destroy
 ### Full Reference
 
 See the [architecture documentation](architecture.md#16-gcp-gke-module) for the complete module reference (all variables, outputs, and configuration options). See the [runbooks](runbooks.md#gcp-gke-deployment) for operational procedures.
+## 8. Alternative: AWS EC2 (Single VM)
+
+For lightweight deployments, testing, or running Argus components on Amazon Web Services, you can deploy a single EC2 instance instead of provisioning a Hetzner k3s cluster or GCP VM.
+
+### Prerequisites
+
+- **AWS account** — with billing enabled
+- **AWS credentials** — configured via environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) or `~/.aws/credentials`
+- **SSH key pair** — for accessing the EC2 instance
+- **CLI tools** — `make install-tools` installs Terraform (the AWS provider is downloaded automatically)
+
+### Provision the EC2 Instance
+
+```bash
+cd terraform/environments/aws-single-vm
+
+# Copy and edit the example vars
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Edit `terraform.tfvars` with your SSH public key and desired configuration:
+
+```hcl
+ssh_public_key  = "ssh-rsa AAA..."        # Required: your public SSH key
+region          = "us-east-1"             # Optional: AWS region
+instance_type   = "t3.xlarge"             # Optional: EC2 instance type
+root_volume_size = 100                    # Optional: root volume size in GB
+```
+
+Initialize and apply:
+
+```bash
+terraform init
+terraform plan
+terraform apply
+```
+
+### Connect to the EC2 Instance
+
+```bash
+# Using the SSH key configured in terraform.tfvars
+ssh argus@$(terraform output -raw public_ip)
+```
+
+### Verify Docker
+
+After the instance boots (wait ~2 minutes), verify Docker and Docker Compose are installed:
+
+```bash
+ssh argus@$(terraform output -raw public_ip) "docker --version && docker compose version"
+```
+
+### Destroy the EC2 Instance
+
+```bash
+cd terraform/environments/aws-single-vm
+terraform destroy
+```
+
+> **Warning:** `terraform destroy` will delete the EC2 instance, VPC, subnet, security group, and Elastic IP. Data on the root volume is lost unless an AMI or snapshot was created.
+
+### Full Reference
+
+See the [architecture documentation](architecture.md#17-aws-ec2-module) for the complete module reference (all variables, outputs, and configuration options). See the [runbooks](runbooks.md#aws-ec2-deployment) for operational procedures.

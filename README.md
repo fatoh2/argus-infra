@@ -4,15 +4,15 @@
 [![Cluster Sanity](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml)
 [![CD Deploy](https://github.com/fatoh2/argus-infra/actions/workflows/cd-deploy.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cd-deploy.yml)
 
-**A production-grade Kubernetes homelab platform** — provisioned with Terraform (Hetzner Cloud / GCP Compute Engine / GKE), configured with Ansible, and managed via GitOps with ArgoCD.
+**A production-grade Kubernetes homelab platform** — provisioned with Terraform (Hetzner Cloud / GCP Compute Engine / GKE / AWS EC2), configured with Ansible, and managed via GitOps with ArgoCD.
 
 ## Overview
 
-Argus Infra provides a complete, reproducible Kubernetes cluster running on Hetzner Cloud VMs, a single VM on GCP Compute Engine, or a managed GKE cluster on Google Cloud. Everything is defined as code:
+Argus Infra provides a complete, reproducible Kubernetes cluster running on Hetzner Cloud VMs, a single VM on GCP Compute Engine or AWS EC2, or a managed GKE cluster on Google Cloud. Everything is defined as code:
 
 | Layer | Tool | Purpose |
 |-------|------|---------|
-| **Infrastructure** | Terraform | Provision Hetzner VMs, GCP Compute Engine VMs, GKE clusters, networks, SSH keys |
+| **Infrastructure** | Terraform | Provision Hetzner VMs, GCP Compute Engine VMs, GKE clusters, AWS EC2 instances, networks, SSH keys |
 | **Configuration** | Ansible | Install k3s, configure nodes, firewall rules |
 | **GitOps** | ArgoCD | Declarative app deployment, self-healing |
 | **Ingress** | Traefik + cert-manager | HTTP routing, automatic TLS via Let's Encrypt |
@@ -108,6 +108,28 @@ kubectl get nodes
 
 See the [GKE module documentation](docs/architecture.md#16-gcp-gke-module) for full details.
 
+### Single VM (AWS EC2)
+
+For lightweight deployments or testing on Amazon Web Services:
+
+```bash
+# 0. Install required CLI tools
+make install-tools
+
+# 1. Provision a single EC2 instance with Docker
+cd terraform/environments/aws-single-vm
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your AWS region and SSH public key
+terraform init && terraform apply
+
+# 2. Connect via SSH
+ssh argus@$(terraform output -raw public_ip)
+
+# 3. Verify Docker is running
+ssh argus@$(terraform output -raw public_ip) "docker --version && docker compose version"
+```
+
+See the [AWS EC2 module documentation](docs/architecture.md#17-aws-ec2-module) for full details.
 
 ## Makefile Targets
 
@@ -135,8 +157,10 @@ argus-infra/
 │   ├── environments/homelab/       # Hetzner Cloud (k3s cluster)
 │   ├── environments/gcp-single-vm/ # GCP Compute Engine (single VM)
 │   ├── environments/gcp-gke/         # GCP GKE (managed Kubernetes cluster)
+│   ├── environments/aws-single-vm/      # AWS EC2 (single VM)
 │   ├── modules/gcp-compute-engine/   # GCP VM Terraform module
-│   └── modules/gcp-gke/              # GCP GKE Terraform module
+│   ├── modules/gcp-gke/              # GCP GKE Terraform module
+│   └── modules/aws-ec2/              # AWS EC2 Terraform module
 ├── ansible/                 # k3s cluster configuration
 │   ├── inventory/
 │   ├── playbooks/
@@ -192,6 +216,6 @@ See [docs/cicd.md](docs/cicd.md) for full pipeline documentation and [docs/runbo
 - **Secure by default** — External Secrets Operator + Doppler for secret injection, NetworkPolicies for least-privilege access, Pod Security Standards (restricted profile)
 - **Makefile-driven workflow** — `make lint`, `make validate`, `make plan`, `make install-tools`, `make local-up/down`, `make check-versions`, `make sanity`
 - **Local development** — k3d cluster for testing without cloud costs
-- **Multi-cloud support** — Hetzner Cloud (k3s cluster), GCP Compute Engine (single VM), and GCP GKE (managed Kubernetes) deployment options
+- **Multi-cloud support** — Hetzner Cloud (k3s cluster), GCP Compute Engine (single VM), GCP GKE (managed Kubernetes), and AWS EC2 (single VM) deployment options
 - **Automated CI/CD** — GitHub Actions validate every PR and deploy on merge to `main`
 - **Architecture Decision Records** — all significant decisions documented in `docs/adr/`

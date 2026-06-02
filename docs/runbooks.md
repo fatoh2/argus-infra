@@ -746,3 +746,55 @@ node_machine_type  = "e2-standard-4"
 ```
 
 > **Note:** Autopilot and Standard are mutually exclusive. You cannot switch a cluster from Autopilot to Standard (or vice versa) after creation — you must destroy and recreate.
+
+
+## AWS EC2 Deployment
+
+### Provision a Single EC2 Instance on AWS
+
+```bash
+cd terraform/environments/aws-single-vm
+
+# 1. Configure
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your SSH public key
+
+# 2. Initialize
+terraform init
+
+# 3. Preview
+terraform plan
+
+# 4. Apply
+terraform apply
+
+# 5. Connect
+ssh argus@$(terraform output -raw public_ip)
+```
+
+### Destroy the EC2 Instance
+
+```bash
+cd terraform/environments/aws-single-vm
+terraform destroy
+```
+
+> **Warning:** `terraform destroy` will delete the EC2 instance, VPC, subnet, security group, and Elastic IP. Data on the root volume is lost unless an AMI or snapshot was created.
+
+### SSH Access
+
+If you configured `ssh_public_key`, connect with:
+```bash
+ssh argus@<public-ip>
+```
+
+### Docker Verification
+
+After the instance boots (wait ~2 minutes), verify Docker is running:
+```bash
+ssh argus@<public-ip> "docker --version && docker compose version"
+```
+
+### Module Reference
+
+See the [architecture documentation](architecture.md#17-aws-ec2-module) for the complete module reference (all variables, outputs, and configuration options). See [ADR 0006](adr/0006-aws-ec2-module.md) for the architecture decision record.

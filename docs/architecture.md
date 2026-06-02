@@ -4,9 +4,9 @@ This document provides an in-depth explanation of the Argus Infra components and
 
 ## 1. Overview
 
-Argus Infra is a fully GitOps-driven Kubernetes homelab platform running on Hetzner Cloud. The architecture follows a layered approach:
+Argus Infra is a fully GitOps-driven Kubernetes homelab platform running on Hetzner Cloud, with additional deployment options on GCP (Compute Engine, GKE) and AWS (EC2). The architecture follows a layered approach:
 
-1. **Infrastructure** — Hetzner Cloud VMs provisioned via Terraform
+1. **Infrastructure** — Hetzner Cloud VMs, GCP Compute Engine VMs, GKE clusters, or AWS EC2 instances provisioned via Terraform
 2. **Cluster** — k3s installed and configured via Ansible
 3. **GitOps** — ArgoCD manages all Kubernetes workloads declaratively
 4. **Ingress & TLS** — Traefik + cert-manager for routing and automatic certificates
@@ -406,3 +406,124 @@ module "argus_gke" {
 ```
 
 **Done when:** `kubectl get nodes` shows all nodes in Ready state.
+
+
+## 17. AWS EC2 Module
+
+Argus Infra includes a Terraform module for deploying a single EC2 instance on Amazon Web Services (AWS). This mirrors the GCP Compute Engine module and is useful for lightweight deployments, testing, or running Argus components on AWS without a full Kubernetes cluster.
+
+### Module: `modules/aws-ec2`
+
+The AWS EC2 module provisions:
+
+- **VPC** — Custom VPC (10.0.0.0/16) with DNS support and hostnames enabled
+- **Internet Gateway** — For public internet access
+- **Public Subnet** — In a configurable availability zone
+- **Route Table** — Default route to the Internet Gateway
+- **Security Group** — SSH (22), HTTP (80), and HTTPS (443) with configurable source CIDR ranges
+- **EC2 Instance** — Ubuntu 22.04 LTS with configurable instance type (default: t3.xlarge) and 100 GB gp3 root volume
+- **Elastic IP** — Static public IP address (optional, enabled by default)
+- **SSH Key Pair** — Injected from a provided public key
+- **IAM Role** — Optional IAM role with configurable policy attachments
+- **Startup Script** — Installs Docker and Docker Compose on first boot
+
+### Usage
+
+```hcl
+module "argus_ec2" {
+  source = "../../modules/aws-ec2"
+
+  name            = "argus-vm"
+  region          = "us-east-1"
+  instance_type   = "t3.xlarge"
+  root_volume_size = 100
+
+  ssh_public_key = var.ssh_public_key
+  ssh_user       = "argus"
+
+  enable_elastic_ip = true
+
+  tags = {
+    Name    = "argus-vm"
+    Project = "argus"
+    Env     = "production"
+  }
+}
+```
+
+### Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `name` | `argus-vm` | EC2 instance name |
+| `region` | `us-east-1` | AWS region |
+| `availability_zone` | `null` (auto) | AWS availability zone |
+| `instance_type` | `t3.xlarge` | EC2 instance type |
+| `root_volume_size` | `100` | Root volume size (GB) |
+| `root_volume_type` | `gp3` | Root volume type |
+| `ami_owner` | `099720109477` | Canonical (Ubuntu) AWS account ID |
+| `ami_name_filter` | `ubuntu/images/hvm-ssd-gp3/ubuntu-22.04-amd64-server-*` | AMI name filter |
+| `vpc_cidr` | `10.0.0.0/16` | VPC CIDR block |
+| `subnet_cidr` | `10.0.1.0/24` | Public subnet CIDR |
+| `enable_dns_hostnames` | `true` | Enable DNS hostnames in VPC |
+| `enable_elastic_ip` | `true` | Allocate and associate Elastic IP |
+| `ssh_public_key` | `null` | SSH public key content |
+| `ssh_user` | `argus` | SSH username |
+| `allowed_ssh_cidrs` | `["0.0.0.0/0"]` | SSH source CIDRs |
+| `allowed_http_cidrs` | `["0.0.0.0/0"]` | HTTP source CIDRs |
+| `allowed_https_cidrs` | `["0.0.0.0/0"]` | HTTPS source CIDRs |
+| `create_iam_role` | `false` | Create an IAM role for the instance |
+| `iam_role_name` | `argus-ec2-role` | IAM role name |
+| `iam_policy_arns` | `[]` | List of IAM policy ARNs to attach |
+| `tags` | `{}` | Resource tags |
+
+### Outputs
+
+| Output | Description |
+|---|---|
+| `instance_id` | EC2 instance ID |
+| `instance_arn` | EC2 instance ARN |
+| `instance_state` | EC2 instance state |
+| `instance_type` | EC2 instance type |
+| `public_ip` | Public IP address (if Elastic IP enabled) |
+| `private_ip` | Private IP address |
+| `public_dns` | Public DNS name |
+| `vpc_id` | VPC ID |
+| `subnet_id` | Subnet ID |
+| `security_group_id` | Security group ID |
+| `ssh_command` | Ready-to-use SSH command |
+| `elastic_ip` | Elastic IP address (if enabled) |
+| `elastic_ip_allocation_id` | Elastic IP allocation ID |
+| `key_pair_name` | SSH key pair name |
+| `iam_role_name` | IAM role name (if created) |
+| `iam_role_arn` | IAM role ARN (if created) |
+
+### Quick Start
+
+```bash
+cd terraform/environments/aws-single-vm
+
+# Copy and edit the example vars
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your SSH public key
+
+# Initialize and plan
+terraform init
+terraform plan
+
+# Apply
+terraform apply
+
+# Connect
+ssh argus@$(terraform output -raw public_ip)
+```
+
+### What the module does NOT do
+
+- It does **not** install Kubernetes or k3s — this is intentionally a single-VM module
+- It does **not** manage DNS records (Route53)
+- It does **not** provision additional EBS volumes beyond the root volume
+- It does **not** set up monitoring or observability
+- It does **not** create a VPC with private subnets or NAT gateways (single public subnet only)
+
+These are left to the user or future enhancements. See [ADR 0006](adr/0006-aws-ec2-module.md) for the full decision record.
