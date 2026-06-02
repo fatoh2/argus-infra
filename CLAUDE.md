@@ -41,7 +41,7 @@ scripts/
 .github/workflows/
   sanity-checks.yml      PR-level Terraform + Ansible + ShellCheck + critical files validation
   cd-deploy.yml          CD pipeline (lint → build → ArgoCD sync on merge to main)
-  cluster-sanity.yml     Scheduled cluster health checks (every 6h)
+  cluster-sanity.yml     Scheduled cluster health checks (every 6h, conditionally enabled via gate job)
   bootstrap.sh           One-command cluster setup
   restore-db.sh          Database restore from pgbackrest
 ```

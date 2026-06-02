@@ -276,7 +276,7 @@ The deployment flow:
 4. ArgoCD detects the change (via webhook or polling) and syncs the cluster
 
 ### Cluster Health Monitoring
-The `cluster-sanity.yml` workflow runs every 6 hours and checks:
+The `cluster-sanity.yml` workflow runs every 6 hours (conditionally enabled via the `CLUSTER_SANITY_ENABLED` repo variable — a `gate` job ensures the cron always succeeds when the cluster is not configured) and checks:
 - All nodes are in `Ready` state
 - All pods in critical namespaces are running
 - All ArgoCD applications are in `Synced` status

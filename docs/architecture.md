@@ -294,7 +294,7 @@ See [docs/cicd.md](cicd.md) for full pipeline documentation, including webhook s
 
 ### Cluster Health Monitoring
 
-The `cluster-sanity.yml` workflow runs on a scheduled basis (every 6 hours) to perform cluster-level health checks:
+The `cluster-sanity.yml` workflow runs on a scheduled basis (every 6 hours) to perform cluster-level health checks. It uses a `gate` job that conditionally enables the checks based on the `CLUSTER_SANITY_ENABLED` repository variable — this ensures the cron job always succeeds even when the cluster is not yet configured.
 
 | Check | What it validates |
 |-------|-------------------|
