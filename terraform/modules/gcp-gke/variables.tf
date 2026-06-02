@@ -27,6 +27,15 @@ variable "zone" {
 }
 
 # ---------------------------------------------------------------------------
+# Cluster mode
+# ---------------------------------------------------------------------------
+variable "enable_autopilot" {
+  description = "Whether to enable Autopilot mode. When true, node pool and many Standard-mode settings are ignored."
+  type        = bool
+  default     = true
+}
+
+# ---------------------------------------------------------------------------
 # Networking
 # ---------------------------------------------------------------------------
 variable "network" {
@@ -84,7 +93,7 @@ variable "master_authorized_cidrs" {
 }
 
 # ---------------------------------------------------------------------------
-# Node pool configuration
+# Node pool configuration (Standard mode only)
 # ---------------------------------------------------------------------------
 variable "machine_type" {
   description = "Machine type for the node pool."
@@ -179,19 +188,19 @@ variable "enable_http_load_balancing" {
 }
 
 variable "enable_horizontal_pod_autoscaling" {
-  description = "Whether to enable horizontal pod autoscaling."
+  description = "Whether to enable the horizontal pod autoscaling addon."
   type        = bool
   default     = true
 }
 
 variable "enable_network_policy" {
-  description = "Whether to enable network policy enforcement (Calico)."
+  description = "Whether to enable network policy enforcement."
   type        = bool
   default     = false
 }
 
 variable "enable_workload_identity" {
-  description = "Whether to enable Workload Identity for the cluster."
+  description = "Whether to enable Workload Identity."
   type        = bool
   default     = true
 }
@@ -203,7 +212,7 @@ variable "enable_vpa" {
 }
 
 variable "enable_cluster_autoscaling" {
-  description = "Whether to enable cluster autoscaler."
+  description = "Whether to enable cluster autoscaling."
   type        = bool
   default     = false
 }
@@ -214,13 +223,19 @@ variable "enable_secure_boot" {
   default     = false
 }
 
-# ---------------------------------------------------------------------------
-# Maintenance
-# ---------------------------------------------------------------------------
 variable "maintenance_window_start" {
-  description = "Daily maintenance window start time (HH:MM format in UTC)."
+  description = "Start time for the daily maintenance window (HH:MM format)."
   type        = string
   default     = "03:00"
+}
+
+# ---------------------------------------------------------------------------
+# Labels
+# ---------------------------------------------------------------------------
+variable "labels" {
+  description = "Additional labels to apply to all resources."
+  type        = map(string)
+  default     = {}
 }
 
 # ---------------------------------------------------------------------------
@@ -233,28 +248,16 @@ variable "deletion_protection" {
 }
 
 # ---------------------------------------------------------------------------
-# Labels
-# ---------------------------------------------------------------------------
-variable "labels" {
-  description = "GCP resource labels to apply to the cluster."
-  type        = map(string)
-  default = {
-    project = "argus"
-    managed = "terraform"
-  }
-}
-
-# ---------------------------------------------------------------------------
 # Kubeconfig
 # ---------------------------------------------------------------------------
 variable "generate_kubeconfig" {
   description = "Whether to generate a kubeconfig file locally."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "kubeconfig_path" {
-  description = "Path to write the kubeconfig file. If null, defaults to ~/.kube/<cluster-name>-config."
+  description = "Path to write the generated kubeconfig file. If null, defaults to ~/.kube/config-<cluster_name>."
   type        = string
   default     = null
 }
