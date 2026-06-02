@@ -59,6 +59,19 @@ Pod Security Standards are enforced via namespace labels in `k8s/security/pod-se
     ```
     Any pod that violates the restricted profile will be rejected by the admission controller.
 
+
+
+### RBAC ServiceAccount Deployment
+RBAC resources (ServiceAccounts, ClusterRoles, ClusterRoleBindings) are deployed via ArgoCD as part of the `security` application.
+1.  **Modify RBAC**: Edit manifests in `k8s/security/rbac/`.
+2.  **Commit and Push**: Push changes to the `develop` branch. After review, merge to `main`.
+3.  **ArgoCD Sync**: ArgoCD will automatically sync the new RBAC resources to the cluster.
+4.  **Verify**:
+    ```bash
+    kubectl get serviceaccounts -A | grep -E 'api-service|argocd-manager|prometheus'
+    kubectl auth can-i list pods --as=system:serviceaccount:monitoring:prometheus
+    ```
+
 ### Workload SecurityContext Updates
 When adding a new workload to a restricted namespace, ensure its `securityContext` complies:
 - Pod-level: `runAsNonRoot: true`, `seccompProfile.type: RuntimeDefault`
@@ -102,6 +115,18 @@ ArgoCD allows easy rollbacks to previous application versions.
     kubectl delete networkpolicy -n <namespace> default-deny-all
     ```
 
+
+
+
+### RBAC ServiceAccount Rollback
+1.  **Revert Git**: Revert the RBAC manifest changes in `k8s/security/rbac/`.
+2.  **ArgoCD Sync**: ArgoCD will revert the RBAC resources.
+3.  **Emergency Workaround**: If ArgoCD sync is broken, delete or patch resources directly:
+    ```bash
+    kubectl delete serviceaccount api-service -n default
+    kubectl delete clusterrole argocd-manager-cluster-role
+    kubectl delete clusterrolebinding argocd-manager-cluster-role-binding
+    ```
 
 ### Pod Security Standards Rollback
 1.  **Revert Git**: Revert the namespace label changes in `k8s/security/pod-security/`.

@@ -240,6 +240,49 @@ kubectl describe ns monitoring
 - The `kube-system` and `argocd` namespaces are intentionally not labeled with the restricted profile, as system-level components may require elevated privileges.
 
 
+## 9.6 RBAC — Least-Privilege ServiceAccounts
+
+Argus Infra enforces least-privilege Kubernetes RBAC by creating dedicated ServiceAccounts for each service, scoped to the minimum permissions required. This follows the principle of least privilege and limits the blast radius of a compromised pod.
+
+### ServiceAccounts
+
+The following ServiceAccounts are defined in `k8s/security/rbac/`:
+
+| ServiceAccount | Namespace | Permissions | Rationale |
+|----------------|-----------|-------------|-----------|
+| `api-service` | `default` | None (no k8s API access) | Application pods do not need to interact with the Kubernetes API |
+| `argocd-manager` | `argocd` | Full management of namespaces, apps, RBAC, CRDs (read-only), and all namespaced resources | ArgoCD needs to create and manage resources across namespaces |
+| `prometheus` | `monitoring` | Read-only (get/list/watch) on nodes, pods, services, deployments, ingresses, and monitoring.coreos.com resources | Prometheus scrapes metrics and needs discovery but should never create or modify resources |
+
+### Key Design Decisions
+
+- **`automountServiceAccountToken: false`** is set on the `api-service` ServiceAccount since it has no k8s API access. This eliminates the attack surface of a mounted token.
+- **No wildcard verbs** — ArgoCD's ClusterRole uses explicit verbs per resource type (e.g., `get`, `list`, `watch`, `create`, `update`, `patch`, `delete`) rather than `["*"]`.
+- **Read-only for Prometheus** — Prometheus only needs to discover targets and read metrics. It has no create/update/delete permissions.
+
+### Verification
+
+```bash
+# api-service has zero k8s API access
+kubectl auth can-i list pods --as=system:serviceaccount:default:api-service
+# → no
+
+# Prometheus is read-only
+kubectl auth can-i create pods --as=system:serviceaccount:monitoring:prometheus
+# → no
+kubectl auth can-i get pods --as=system:serviceaccount:monitoring:prometheus
+# → yes
+
+# ArgoCD can still manage resources
+kubectl auth can-i create deployments --as=system:serviceaccount:argocd:argocd-manager
+# → yes
+```
+
+### Deployment
+
+RBAC resources are deployed via ArgoCD as part of the `security` application, which sources from `k8s/security/` (a kustomization that includes both `network-policies` and `rbac` subdirectories).
+
+
 ## 10. CI/CD Pipeline & Testing
 
 Argus Infra uses GitHub Actions for continuous integration and cluster health monitoring. The pipeline is designed to catch issues early and ensure cluster reliability.
@@ -302,6 +345,7 @@ User commits to Git
        ├──► Prometheus (metrics)
        ├──► Loki (logs)
        ├──► External Secrets (Doppler)
+       ├──► RBAC (least-privilege ServiceAccounts)
        └──► NetworkPolicies (default deny, least-privilege)
 ```
 
@@ -312,89 +356,3 @@ Key architecture decisions are documented as Architecture Decision Records (ADRs
 - **ADR-0001:** Hetzner Cloud VM provisioning with Terraform
 - **ADR-0002:** k3s vs kubeadm for Kubernetes cluster
 - **ADR-0003:** ArgoCD for GitOps
-
-## 9.5 Pod Security Standards
-
-Argus Infra enforces Kubernetes [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/) at the **restricted** level across all application namespaces. This is the strictest built-in policy level and provides defense-in-depth alongside NetworkPolicies.
-
-### Namespace Labeling
-
-Each application namespace is labeled with Pod Security admission controller labels:
-
-```yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: monitoring
-  labels:
-    pod-security.kubernetes.io/enforce: restricted
-    pod-security.kubernetes.io/enforce-version: latest
-    pod-security.kubernetes.io/audit: restricted
-    pod-security.kubernetes.io/audit-version: latest
-    pod-security.kubernetes.io/warn: restricted
-    pod-security.kubernetes.io/warn-version: latest
-```
-
-The following namespaces are labeled (manifests in `k8s/security/pod-security/`):
-
-| Namespace | Purpose |
-|-----------|---------|| `monitoring` | Prometheus, Grafana, Loki, Promtail |
-| `databases` | PostgreSQL, Redis |
-| `ingress` | Traefik, cert-manager, wildcard TLS |
-| `traefik` | Traefik ingress controller |
-| `cert-manager` | cert-manager operator |
-| `default` | General application workloads |
-
-## 9.5 Pod Security Standards
-
-Argus Infra enforces Kubernetes [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/) at the **restricted** level across all application namespaces. This is the strictest built-in policy level and provides defense-in-depth alongside NetworkPolicies.
-
-### Namespace Labeling
-
-Each application namespace is labeled with Pod Security admission controller labels:
-
-
-
-The following namespaces are labeled (manifests in ):
-
-| Namespace | Purpose |
-|-----------|---------|
-|  | Prometheus, Grafana, Loki, Promtail |
-|  | PostgreSQL, Redis |
-|  | Traefik, cert-manager, wildcard TLS |
-|  | Traefik ingress controller |
-|  | cert-manager operator |
-|  | General application workloads |
-
-## 9.5 Pod Security Standards
-
-Argus Infra enforces Kubernetes [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/) at the **restricted** level across all application namespaces. This is the strictest built-in policy level and provides defense-in-depth alongside NetworkPolicies.
-
-### Namespace Labeling
-
-Each application namespace is labeled with Pod Security admission controller labels:
-
-```yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: monitoring
-  labels:
-    pod-security.kubernetes.io/enforce: restricted
-    pod-security.kubernetes.io/enforce-version: latest
-    pod-security.kubernetes.io/audit: restricted
-    pod-security.kubernetes.io/audit-version: latest
-    pod-security.kubernetes.io/warn: restricted
-    pod-security.kubernetes.io/warn-version: latest
-```
-
-The following namespaces are labeled (manifests in `k8s/security/pod-security/`):
-
-| Namespace | Purpose |
-|-----------|---------|
-| `monitoring` | Prometheus, Grafana, Loki, Promtail |
-| `databases` | PostgreSQL, Redis |
-| `ingress` | Traefik, cert-manager, wildcard TLS |
-| `traefik` | Traefik ingress controller |
-| `cert-manager` | cert-manager operator |
-| `default` | General application workloads |
