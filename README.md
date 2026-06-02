@@ -60,7 +60,8 @@ argus-infra/
 │   ├── grafana/            # Grafana dashboards & provisioning
 │   ├── security/           # Security policies
 │   │   ├── network-policies/  # Default deny + explicit allow rules
-│   │   └── pod-security/      # Pod Security Standards (restricted profile)
+│   │   ├── pod-security/      # Pod Security Standards (restricted profile)
+│   │   └── rbac/              # Least-privilege ServiceAccounts
 │   └── cluster-issuer/     # Let's Encrypt ClusterIssuers
 ├── scripts/                # Operational and CI scripts
 │   ├── run-sanity-checks.sh   # Local sanity suite (Terraform, Ansible, ArgoCD)
@@ -83,6 +84,7 @@ argus-infra/
 - **Secure by default** — External Secrets Operator for secrets, private network for nodes
 - **Network Policies** — default-deny on all namespaces with explicit allow rules for least-privilege pod communication
 - **Pod Security Standards** — restricted profile enforced on all namespaces; workloads configured with `runAsNonRoot`, `readOnlyRootFilesystem`, and dropped capabilities
+- **Least-Privilege RBAC** — dedicated ServiceAccounts for each service with minimum required permissions; `api-service` has zero k8s API access
 - **CI-validated** — Terraform validate + fmt, Ansible syntax check + lint, ShellCheck, critical file checks on every PR
 - **Cluster health monitoring** — scheduled cluster sanity checks (nodes, pods, ArgoCD apps, ingress) every 6 hours
 - **Local sanity suite** — run `./scripts/run-sanity-checks.sh` before committing to catch issues early
