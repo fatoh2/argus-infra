@@ -312,3 +312,35 @@ Key architecture decisions are documented as Architecture Decision Records (ADRs
 - **ADR-0001:** Hetzner Cloud VM provisioning with Terraform
 - **ADR-0002:** k3s vs kubeadm for Kubernetes cluster
 - **ADR-0003:** ArgoCD for GitOps
+
+## 9.5 Pod Security Standards
+
+Argus Infra enforces Kubernetes [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/) at the **restricted** level across all application namespaces. This is the strictest built-in policy level and provides defense-in-depth alongside NetworkPolicies.
+
+### Namespace Labeling
+
+Each application namespace is labeled with Pod Security admission controller labels:
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+```
+
+The following namespaces are labeled (manifests in `k8s/security/pod-security/`):
+
+| Namespace | Purpose |
+|-----------|---------|| `monitoring` | Prometheus, Grafana, Loki, Promtail |
+| `databases` | PostgreSQL, Redis |
+| `ingress` | Traefik, cert-manager, wildcard TLS |
+| `traefik` | Traefik ingress controller |
+| `cert-manager` | cert-manager operator |
+| `default` | General application workloads |
