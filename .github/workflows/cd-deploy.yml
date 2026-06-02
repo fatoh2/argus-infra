@@ -117,7 +117,7 @@ jobs:
             -var="server_type=cx22" \
             -var="image=ubuntu-24.04"
 
-      - name: Terraform Plan (skipped — no HCLOUD_TOKEN)
+      - name: Terraform Plan (skipped - no HCLOUD_TOKEN)
         if: ${{ secrets.HCLOUD_TOKEN == '' }}
         run: |
           echo "Terraform plan skipped: HCLOUD_TOKEN not configured."
