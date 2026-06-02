@@ -1,0 +1,18 @@
+# Copy to terraform.tfvars and fill in real values.
+# terraform.tfvars is gitignored (only *.tfvars.example is committed).
+
+# === Required ===
+
+# GCP project ID
+project_id = "your-gcp-project-id"
+
+# Public SSH key content (the full "ssh-rsa AAAA..." string)
+ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ..."
+
+# === Optional (defaults shown) ===
+
+# region     = "us-central1"
+# zone       = "us-central1-a"
+# machine_type = "e2-standard-4"
+# boot_disk_size = 100
+# ssh_user   = "argus"
