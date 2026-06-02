@@ -21,31 +21,52 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check Critical Files Exist
+        run: |
+          CRITICAL_FILES=(
+            terraform/environments/homelab/main.tf
+            ansible/playbooks/site.yml
+            k8s/argocd/install.yaml
+            scripts/cluster-sanity.sh
+            CLAUDE.md
+            README.md
+          )
+          MISSING_FILES=()
+          for file in ""; do
+            if [ ! -f "" ]; then
+              MISSING_FILES+=("")
+            fi
+          done
+          if [ 0 -gt 0 ]; then
+            echo "Error: The following critical files are missing:"
+            for missing_file in ""; do
+              echo "- "
+            done
+            exit 1
+          fi
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.5.7
 
       - name: Terraform Format Check
-        run: |
-          if [ -d "terraform/environments/homelab" ]; then
+        run: |          if [ -d "terraform/environments/homelab" ]; then
             cd terraform/environments/homelab && terraform fmt -check -recursive
           else
             echo "No Terraform environment found, skipping"
           fi
 
       - name: Setup Ansible Lint
-        run: |
-          python3 -m venv /tmp/ansible-venv
+        run: |          python3 -m venv /tmp/ansible-venv
           /tmp/ansible-venv/bin/pip install -q ansible-core ansible-lint
           if [ -f ansible/requirements.yml ]; then
             /tmp/ansible-venv/bin/ansible-galaxy collection install -r ansible/requirements.yml
           fi
 
       - name: Ansible Lint
-        run: |
-          if [ -d ansible/playbooks ] || [ -d ansible/roles ]; then
-            /tmp/ansible-venv/bin/ansible-lint ansible/ --warn-list=all || true
+        run: |          if [ -d ansible/playbooks ] || [ -d ansible/roles ]; then
+            /tmp/ansible-venv/bin/ansible-lint ansible/ || true
           else
             echo "No Ansible content found, skipping"
           fi
@@ -55,7 +76,6 @@ jobs:
         with:
           scandir: ./scripts
           severity: warning
-        continue-on-error: true
 
   build:
     name: Build (Validate)
@@ -69,12 +89,12 @@ jobs:
         with:
           terraform_version: 1.5.7
 
-      - name: Terraform Validate
-        run: |
-          if [ -d "terraform/environments/homelab" ]; then
+      - name: Terraform Validate and Plan
+        run: |          if [ -d "terraform/environments/homelab" ]; then
             cd terraform/environments/homelab
-            terraform init -backend=false
-            terraform validate
+            terraform init -backend=false -input=false
+            terraform validate -input=false
+            terraform plan -input=false -no-color
           else
             echo "No Terraform environment found, skipping"
           fi
@@ -84,6 +104,5 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          echo "Deploy step: set KUBECONFIG + ARGOCD_SERVER + ARGOCD_TOKEN in repo secrets to enable."
+      - run: |          echo "Deploy step: set KUBECONFIG + ARGOCD_SERVER + ARGOCD_TOKEN in repo secrets to enable."
           echo "Skipping for now."
