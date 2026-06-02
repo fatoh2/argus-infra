@@ -51,6 +51,9 @@ See the [CI/CD Pipeline documentation](docs/cicd.md) for details on how changes 
 
 See the [CI/CD Pipeline documentation](docs/cicd.md) for details on how changes are validated and deployed.
 
+
+See the [CI/CD Pipeline documentation](docs/cicd.md) for details on how changes are validated and deployed.
+
 See the [CI/CD Pipeline documentation](docs/cicd.md) for details on how changes are validated and deployed.
 
 
@@ -98,6 +101,7 @@ argus-infra/
 │   ├── cicd.md         # CI/CD pipeline overview
 │   ├── cicd.md         # CI/CD pipeline overview
 │   ├── cicd.md         # CI/CD pipeline overview
+│   ├── cicd.md         # CI/CD pipeline overview
 │   ├── architecture.md     # System architecture
 │   ├── setup.md            # Setup guide
 │   └── adr/                # Architecture Decision Records
@@ -109,8 +113,9 @@ argus-infra/
     ├── cd-deploy.yml   # CD pipeline (ArgoCD sync)
     ├── cd-deploy.yml   # CD pipeline (ArgoCD sync)
     ├── cd-deploy.yml   # CD pipeline (ArgoCD sync)
+    ├── cd-deploy.yml   # CD pipeline (ArgoCD sync)
 │   ├── cd-deploy.yml   # CD pipeline (ArgoCD sync)      # CI/CD pipeline
-    ├── sanity-checks.yml   # PR-level Terraform + Ansible validation, CD-level ArgoCD sync, CD-level ArgoCD sync, CD-level ArgoCD sync, CD-level ArgoCD sync, CD-level ArgoCD sync, CD-level ArgoCD sync, CD-level ArgoCD sync, CD-level ArgoCD sync
+    ├── sanity-checks.yml   # PR-level Terraform + Ansible validation, CD-level ArgoCD sync, CD-level ArgoCD sync, CD-level ArgoCD sync, CD-level ArgoCD sync, CD-level ArgoCD sync, CD-level ArgoCD sync, CD-level ArgoCD sync, CD-level ArgoCD sync, CD-level ArgoCD sync
     └── cluster-sanity.yml  # Cluster-level health checks (scheduled)
 ```
 
