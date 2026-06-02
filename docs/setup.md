@@ -425,6 +425,8 @@ kubectl get pods -A
 # CoreDNS and other system pods should be running
 ```
 
+> **Tip:** The module generates a kubeconfig file at `$(terraform output -raw kubeconfig_path)` when `generate_kubeconfig` is enabled (default: `true`). Use it directly with `export KUBECONFIG=$(terraform output -raw kubeconfig_path)`.
+
 ### Default Helm Repos
 
 The GKE module automatically adds the following Helm repositories after cluster creation:

@@ -333,8 +333,12 @@ module "argus_vm" {
 |---|---|
 | `instance_id` | Instance ID |
 | `instance_name` | Instance name |
+| `instance_self_link` | Self-link (URI) of the instance |
+| `zone` | GCP zone where the instance was created |
+| `machine_type` | Machine type of the instance |
 | `network_ip` | Private IP address |
 | `nat_ip` | Public IP address (if enabled) |
+| `nat_ips` | List of external IPs assigned to the instance |
 | `instance_public_ip` | Alias for `nat_ip` — external public IP (if enabled) |
 | `ssh_command` | Ready-to-use SSH command |
 | `firewall_rule_names` | Created firewall rule names |
@@ -386,6 +390,7 @@ Argus Infra includes a Terraform module for deploying a Google Kubernetes Engine
 |---|---|
 | `cluster_id` | GKE cluster ID |
 | `cluster_name` | GKE cluster name |
+| `cluster_location` | Location (region or zone) of the GKE cluster |
 | `cluster_endpoint` | Cluster Kubernetes endpoint IP/DNS |
 | `cluster_ca_certificate` | Base64-encoded CA certificate (sensitive) |
 | `cluster_kubernetes_version` | Kubernetes version running on the cluster |
@@ -396,6 +401,7 @@ Argus Infra includes a Terraform module for deploying a Google Kubernetes Engine
 | `kubectl_configure_command` | Command to configure kubectl for this cluster |
 | `network` | VPC network used by the cluster |
 | `subnetwork` | Subnetwork used by the cluster |
+| `cluster_self_link` | Self-link (URI) of the GKE cluster |
 | `node_pool_name` | Primary node pool name (Standard mode only) |
 | `node_pool_node_count` | Primary node pool node count (Standard mode only) |
 

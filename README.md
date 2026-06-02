@@ -106,6 +106,8 @@ gcloud container clusters get-credentials $(terraform output -raw cluster_name) 
 kubectl get nodes
 ```
 
+> **Tip:** The module also generates a kubeconfig file at `$(terraform output -raw kubeconfig_path)` when `generate_kubeconfig` is enabled (default: `true`).
+
 See the [GKE module documentation](docs/architecture.md#16-gcp-gke-module) for full details.
 
 ### Single VM (AWS EC2)

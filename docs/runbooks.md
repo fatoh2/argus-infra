@@ -706,6 +706,9 @@ $(terraform output -raw kubectl_configure_command)
 
 # 6. Verify
 kubectl get nodes
+
+# 7. (Optional) Use the generated kubeconfig
+export KUBECONFIG=$(terraform output -raw kubeconfig_path)
 ```
 
 ### Destroy the GKE Cluster
