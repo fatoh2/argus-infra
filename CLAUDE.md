@@ -39,7 +39,7 @@ scripts/
   argocd-health.sh       ArgoCD app health check
   cluster-sanity.sh      Full cluster-level sanity checks
 .github/workflows/
-  sanity-checks.yml      PR-level Terraform + Ansible validation
+  sanity-checks.yml      PR-level Terraform + Ansible + ShellCheck + critical files validation
   cd-deploy.yml          CD pipeline (lint → build → ArgoCD sync on merge to main)
   cluster-sanity.yml     Scheduled cluster health checks (every 6h)
   bootstrap.sh           One-command cluster setup

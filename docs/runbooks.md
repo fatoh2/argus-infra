@@ -427,20 +427,28 @@ Every PR to `develop` runs sanity checks automatically via GitHub Actions (`.git
 
 **What's checked:**
 - Terraform validate + format
+- Terraform plan (dry-run)
 - Ansible syntax + lint
+- ShellCheck (shell script static analysis)
+- Critical files existence check
 
 **If CI fails:**
 1. Click "Details" on the failing check in the PR
 2. Fix the issue in your branch
 3. Push again — CI re-runs automatically
 
-### CD: Continuous Deployment
-Every merge to `main` triggers the CD workflow (`.github/workflows/cd-deploy.yml`).
+### CD: Continuous Deployment (Three-Stage Pipeline)
+Every merge to `main` triggers the CD workflow (`.github/workflows/cd-deploy.yml`), which runs three sequential stages:
+
+**Stage 1 — Lint:** Terraform format check, Ansible lint, ShellCheck
+**Stage 2 — Build:** Terraform validate + plan (dry-run), Ansible syntax check, critical files check
+**Stage 3 — Deploy:** ArgoCD sync notification + optional API sync
 
 **What happens:**
-1. Validation runs (same as CI)
-2. ArgoCD detects the change (via webhook or polling)
-3. ArgoCD syncs the cluster to match `main`
+1. Lint stage runs code quality checks
+2. Build stage validates infrastructure config compiles end-to-end
+3. Deploy stage notifies ArgoCD of the change
+4. ArgoCD detects the change (via webhook or polling) and syncs the cluster
 
 **Monitoring a deployment:**
 ```bash
