@@ -115,17 +115,119 @@ Argus Infra uses Traefik as its ingress controller, replacing the default k3s Tr
 
 ## 8. Secrets Management (External Secrets Operator + Doppler)
 
-Secrets are managed securely using External Secrets Operator (ESO) with Doppler as the backend.
+Secrets are managed securely using **External Secrets Operator (ESO)** with **Doppler** as the backend.
 
-### External Secrets Operator
-- **Deployment:** Deployed via Helm chart in the `security` namespace.
-- **Secret Stores:** Configured to pull secrets from Doppler projects.
-- **External Secrets:** Define which secrets to sync from Doppler into Kubernetes Secrets.
+### Architecture
 
-### Doppler
-- **Backend:** Doppler serves as the central secrets management platform.
-- **Projects:** Each application (e.g., `argus-monitor`, `argus-ai`) has its own Doppler project.
-- **Integration:** ESO authenticates with Doppler using a service token stored in a Kubernetes Secret.
+```
+Doppler (source of truth)
+    │
+    ▼
+External Secrets Operator (syncs secrets into the cluster)
+    │
+    ▼
+Kubernetes Secrets (consumed by pods)
+```
+
+- **Doppler** is the single source of truth for all secrets (API keys, database URLs, tokens).
+- **External Secrets Operator** runs in the `external-secrets-operator` namespace and syncs secrets from Doppler into Kubernetes `Secret` objects.
+- **SecretStore** resources define how ESO authenticates to Doppler.
+- **ExternalSecret** resources define which Doppler secrets to sync and where to store them.
+
+### Deployment
+
+ESO is deployed via ArgoCD (app-of-apps pattern). The ArgoCD application at `k8s/argocd/apps/external-secrets.yaml` points to `k8s/external-secrets/`, which contains:
+
+- **`helm-repository.yaml`** — Flux HelmRepository pointing to `https://charts.external-secrets.io`
+- **`helm-release.yaml`** — Flux HelmRelease deploying ESO v0.9.x with CRDs
+- **`secretstore.yaml`** — A `SecretStore` resource named `doppler-backend` in the `default` namespace
+- **`example-external-secret.yaml`** — An example `ExternalSecret` syncing `DATABASE_URL`, `REDIS_URL`, and `API_KEY`
+- **`doppler-auth-secret.yaml`** — A placeholder Kubernetes `Secret` for the Doppler service token (token must be applied manually — never committed to git)
+- **`kustomization.yaml`** — Kustomize resources list
+
+### Doppler Authentication
+
+ESO authenticates to Doppler using a service token stored in a Kubernetes Secret:
+
+```bash
+kubectl create secret generic doppler-auth   --namespace external-secrets-operator   --from-literal=token='dp.st.your_token_here'   --dry-run=client -o yaml | kubectl apply -f -
+```
+
+> **Never** commit the actual token to the repository. The file `k8s/external-secrets/doppler-auth-secret.yaml` contains a placeholder only.
+
+### SecretStore
+
+The `SecretStore` resource (`k8s/external-secrets/secretstore.yaml`) configures ESO to use Doppler as the provider:
+
+```yaml
+apiVersion: external-secrets.io/v1beta1
+kind: SecretStore
+metadata:
+  name: doppler-backend
+  namespace: default
+spec:
+  provider:
+    doppler:
+      auth:
+        secretRef:
+          dopplerToken:
+            name: doppler-auth
+            key: token
+```
+
+### ExternalSecret Example
+
+An `ExternalSecret` defines which Doppler secrets to sync and where to store them:
+
+```yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: example-app-secret
+  namespace: default
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: doppler-backend
+    kind: SecretStore
+  target:
+    name: example-app-secret
+    creationPolicy: Owner
+  data:
+    - secretKey: DATABASE_URL
+      remoteRef:
+        key: DATABASE_URL
+    - secretKey: REDIS_URL
+      remoteRef:
+        key: REDIS_URL
+    - secretKey: API_KEY
+      remoteRef:
+        key: API_KEY
+```
+
+### Verification
+
+```bash
+# Check ESO pods are running
+kubectl get pods -n external-secrets-operator
+
+# Check SecretStore status
+kubectl get secretstore -n default doppler-backend -o wide
+
+# Check ExternalSecret status
+kubectl get externalsecret -n default example-app-secret -o wide
+
+# Verify the synced secret exists
+kubectl get secret -n default example-app-secret
+```
+
+### Security Notes
+
+- Doppler service tokens are stored as Kubernetes Secrets in the `external-secrets-operator` namespace
+- The `doppler-auth` secret is **never** committed to git with a real token
+- ExternalSecrets use `creationPolicy: Owner` so ESO manages the lifecycle
+- Secrets are refreshed every hour (`refreshInterval: 1h`)
+- ESO RBAC is scoped to only manage secrets in namespaces where ExternalSecrets are defined
 
 See [docs/secrets.md](secrets.md) for the full setup guide, verification steps, and troubleshooting.
 

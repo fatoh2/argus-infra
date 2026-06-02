@@ -300,6 +300,19 @@ Secrets are managed via Doppler. To rotate a secret:
    kubectl rollout restart deployment/<name> -n <namespace>
    ```
 
+### External Secrets Operator Troubleshooting
+
+| Symptom | Likely Cause | Fix |
+|---------|-------------|------|
+| SecretStore not Ready | Invalid or missing Doppler token | Check `doppler-auth` secret in `external-secrets-operator` namespace: `kubectl get secret -n external-secrets-operator doppler-auth -o jsonpath='{.data.token}' \| base64 -d` |
+| ExternalSecret not syncing | SecretStore not Ready | Check SecretStore status: `kubectl get secretstore -n default doppler-backend -o wide` |
+| Secret not created | Namespace mismatch | Ensure ExternalSecret and SecretStore are in the same namespace (or use a ClusterSecretStore) |
+| ESO pod crash looping | Resource limits too low | Check pod logs: `kubectl logs -n external-secrets-operator deployment/external-secrets` |
+| Secret value is stale | refreshInterval not elapsed | Force a refresh by deleting the ExternalSecret pod or waiting for the next sync interval (default: 1h) |
+
+See [docs/secrets.md](secrets.md) for complete setup and verification steps.
+
+
 ### Pod Security Violations
 If a pod is rejected due to Pod Security Standards:
 1. Check the violation details: `kubectl describe pod <pod> -n <namespace>`
@@ -322,6 +335,7 @@ kubectl exec -n kube-system etcd-<node-name> -- etcdctl snapshot save /tmp/etcd-
 ```
 
 To restore, follow the k3s etcd restoration guide.
+
 
 ## 7. Database Backup and Restore
 
@@ -415,9 +429,7 @@ The script will:
 
 ```bash
 # Restore from a specific S3 backup
-S3_ENDPOINT=https://s3.eu-central-1.amazonaws.com \
-S3_BUCKET=argus-backups \
-./k8s/databases/restore-db.sh s3://argus-backups/postgres-argus-db-2024-01-01T02-00-00Z.dump
+S3_ENDPOINT=https://s3.eu-central-1.amazonaws.com S3_BUCKET=argus-backups ./k8s/databases/restore-db.sh s3://argus-backups/postgres-argus-db-2024-01-01T02-00-00Z.dump
 
 # Restore from a local file
 ./k8s/databases/restore-db.sh /path/to/backup.dump
@@ -427,29 +439,23 @@ S3_BUCKET=argus-backups \
 
 ```bash
 # 1. Download the backup
-aws s3 cp s3://argus-backups/postgres-argus-db-latest.dump /tmp/restore.dump \
-  --endpoint-url=https://s3.eu-central-1.amazonaws.com
+aws s3 cp s3://argus-backups/postgres-argus-db-latest.dump /tmp/restore.dump   --endpoint-url=https://s3.eu-central-1.amazonaws.com
 
 # 2. Find the PostgreSQL pod
-PG_POD=$(kubectl get pods -n databases -l app.kubernetes.io/name=postgresql \
-  --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
+PG_POD=$(kubectl get pods -n databases -l app.kubernetes.io/name=postgresql   --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
 
 # 3. Copy backup to pod
 kubectl cp /tmp/restore.dump databases/${PG_POD}:/tmp/restore.dump
 
 # 4. Run restore inside the pod
-kubectl exec -n databases ${PG_POD} -- \
-  pg_restore --dbname=argus_db --username=argus_admin \
-  --clean --if-exists --verbose /tmp/restore.dump
+kubectl exec -n databases ${PG_POD} --   pg_restore --dbname=argus_db --username=argus_admin   --clean --if-exists --verbose /tmp/restore.dump
 
 # 5. Clean up
 kubectl exec -n databases ${PG_POD} -- rm -f /tmp/restore.dump
 rm -f /tmp/restore.dump
 
 # 6. Verify
-kubectl exec -n databases ${PG_POD} -- \
-  psql -U argus_admin -d argus_db -c \
-  "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';"
+kubectl exec -n databases ${PG_POD} --   psql -U argus_admin -d argus_db -c   "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';"
 ```
 
 ### 7.7 Restore Drill Checklist
@@ -474,3 +480,5 @@ Use this checklist to verify the restore procedure works:
 | Restore fails with "role does not exist" | Wrong restore user | Use `postgres` superuser or create the role first |
 | Restore fails with "database already exists" | Use `--clean` flag | Already included in the script |
 | Restore is slow | Large database | Consider using `--jobs=4` for parallel restore |
+
+
