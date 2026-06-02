@@ -312,6 +312,7 @@ Secrets are managed via Doppler. To rotate a secret:
 
 See [docs/secrets.md](secrets.md) for complete setup and verification steps.
 
+
 ### Pod Security Violations
 If a pod is rejected due to Pod Security Standards:
 1. Check the violation details: `kubectl describe pod <pod> -n <namespace>`
@@ -334,3 +335,150 @@ kubectl exec -n kube-system etcd-<node-name> -- etcdctl snapshot save /tmp/etcd-
 ```
 
 To restore, follow the k3s etcd restoration guide.
+
+
+## 7. Database Backup and Restore
+
+### 7.1 Overview
+
+PostgreSQL backups are handled by a Kubernetes CronJob (`postgres-backup`) running daily at 2 AM UTC in the `databases` namespace. Backups use `pg_dump` with the custom format (compressed, parallel-restore capable) and are uploaded to S3-compatible object storage (MinIO / Backblaze B2 / AWS S3).
+
+**Backup retention**: 30 days (automatic cleanup of older backups).
+
+### 7.2 Backup Architecture
+
+```
+CronJob (postgres-backup)
+  │  Runs daily at 02:00 UTC
+  │
+  ├─ pg_dump --format=custom --compress=9
+  │     → /tmp/backup.dump
+  │
+  └─ aws s3 cp → s3://<bucket>/postgres-argus-db-<timestamp>.dump
+               → s3://<bucket>/postgres-argus-db-latest.dump (overwrite)
+```
+
+**Key files**:
+- `k8s/databases/postgres-backup-cronjob.yaml` — CronJob definition
+- `k8s/databases/postgres-backup-secret.yaml` — Database credentials
+- `k8s/databases/restore-db.sh` — Restore script (run locally with kubectl)
+
+### 7.3 Prerequisites
+
+- PostgreSQL must be deployed and running in the `databases` namespace
+- A PostgreSQL user with read access (`backup_user`) must exist
+- S3-compatible storage must be configured (see `k8s/aws-s3-credentials.yaml`)
+- The `aws-s3-credentials` secret must contain:
+  - `access_key_id`
+  - `secret_access_key`
+  - `endpoint_url` (e.g., `https://s3.eu-central-1.amazonaws.com` or internal MinIO URL)
+  - `bucket` (e.g., `argus-backups`)
+
+### 7.4 Creating the Backup User
+
+If the `backup_user` does not exist in PostgreSQL, create it:
+
+```bash
+# Connect to the PostgreSQL pod
+kubectl exec -n databases deploy/postgresql -- psql -U postgres
+
+# Inside psql:
+CREATE USER backup_user WITH PASSWORD 'strong-password';
+GRANT CONNECT ON DATABASE argus_db TO backup_user;
+GRANT USAGE ON SCHEMA public TO backup_user;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO backup_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO backup_user;
+\q
+```
+
+Then update the password in `k8s/databases/postgres-backup-secret.yaml`:
+```bash
+echo -n "strong-password" | base64
+```
+
+### 7.5 Manual Backup Trigger
+
+To trigger an immediate backup (e.g., before a risky operation):
+
+```bash
+kubectl create job --from=cronjob/postgres-backup -n databases manual-backup-$(date +%s)
+```
+
+Monitor the backup:
+```bash
+kubectl logs -n databases -l job-name=manual-backup-<timestamp> --tail=50 -f
+```
+
+### 7.6 Restore Procedure
+
+#### Option A: Restore using the script (recommended)
+
+```bash
+# From the repo root:
+./k8s/databases/restore-db.sh latest
+```
+
+The script will:
+1. Fetch the latest backup from S3
+2. Find the running PostgreSQL pod
+3. Copy the backup file to the pod
+4. Run `pg_restore --clean --if-exists` (drops existing data first)
+5. Verify the restore by counting tables
+
+#### Option B: Restore a specific backup
+
+```bash
+# Restore from a specific S3 backup
+S3_ENDPOINT=https://s3.eu-central-1.amazonaws.com S3_BUCKET=argus-backups ./k8s/databases/restore-db.sh s3://argus-backups/postgres-argus-db-2024-01-01T02-00-00Z.dump
+
+# Restore from a local file
+./k8s/databases/restore-db.sh /path/to/backup.dump
+```
+
+#### Option C: Manual restore (step by step)
+
+```bash
+# 1. Download the backup
+aws s3 cp s3://argus-backups/postgres-argus-db-latest.dump /tmp/restore.dump   --endpoint-url=https://s3.eu-central-1.amazonaws.com
+
+# 2. Find the PostgreSQL pod
+PG_POD=$(kubectl get pods -n databases -l app.kubernetes.io/name=postgresql   --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
+
+# 3. Copy backup to pod
+kubectl cp /tmp/restore.dump databases/${PG_POD}:/tmp/restore.dump
+
+# 4. Run restore inside the pod
+kubectl exec -n databases ${PG_POD} --   pg_restore --dbname=argus_db --username=argus_admin   --clean --if-exists --verbose /tmp/restore.dump
+
+# 5. Clean up
+kubectl exec -n databases ${PG_POD} -- rm -f /tmp/restore.dump
+rm -f /tmp/restore.dump
+
+# 6. Verify
+kubectl exec -n databases ${PG_POD} --   psql -U argus_admin -d argus_db -c   "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';"
+```
+
+### 7.7 Restore Drill Checklist
+
+Use this checklist to verify the restore procedure works:
+
+- [ ] Backup file exists in S3 bucket
+- [ ] Backup file is valid (not corrupted)
+- [ ] PostgreSQL pod is running and accessible
+- [ ] Restore completes without errors
+- [ ] Table count matches expected value
+- [ ] Application can connect and read data after restore
+- [ ] No data loss in other databases on the same instance
+
+### 7.8 Troubleshooting
+
+| Symptom | Likely Cause | Solution |
+|---------|-------------|----------|
+| Backup job fails with "password authentication failed" | Wrong backup credentials | Update `postgres-backup-credentials` secret |
+| Backup job fails with "could not translate host name" | PostgreSQL service name wrong | Check `PGHOST` env var in CronJob |
+| Backup upload fails with "403" | Invalid S3 credentials | Check `aws-s3-credentials` secret |
+| Restore fails with "role does not exist" | Wrong restore user | Use `postgres` superuser or create the role first |
+| Restore fails with "database already exists" | Use `--clean` flag | Already included in the script |
+| Restore is slow | Large database | Consider using `--jobs=4` for parallel restore |
+
+

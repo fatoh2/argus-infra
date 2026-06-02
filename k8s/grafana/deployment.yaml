@@ -15,11 +15,39 @@ spec:
       labels:
         app: grafana
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 472
+        runAsGroup: 472
+        fsGroup: 472
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: grafana
-        image: grafana/grafana:latest
+        image: grafana/grafana:11.0.0
         ports:
         - containerPort: 3000
+        env:
+        - name: GF_SECURITY_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              name: grafana-admin-credentials
+              key: admin-user
+              optional: false
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-admin-credentials
+              key: admin-password
+              optional: false
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          runAsUser: 472
         volumeMounts:
         - name: grafana-persistent
           mountPath: /var/lib/grafana
@@ -27,12 +55,17 @@ spec:
           mountPath: /etc/grafana/provisioning/datasources
         - name: grafana-dashboards
           mountPath: /etc/grafana/provisioning/dashboards
+        - name: tmp
+          mountPath: /tmp
       volumes:
       - name: grafana-persistent
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: grafana-data
       - name: grafana-config
         configMap:
           name: grafana-datasource-config
       - name: grafana-dashboards
         configMap:
           name: grafana-dashboards-config
+      - name: tmp
+        emptyDir: {}
