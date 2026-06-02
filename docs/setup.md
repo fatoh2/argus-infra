@@ -1,6 +1,6 @@
 # Argus Infra Setup
 
-This document outlines the steps to set up the Argus Infrastructure repository — a Kubernetes homelab platform on Hetzner Cloud using Terraform, Ansible, and ArgoCD.
+This document outlines the steps to set up the Argus Infrastructure repository — a Kubernetes homelab platform on Hetzner Cloud (k3s), GCP Compute Engine (single VM), or GCP GKE (managed Kubernetes) using Terraform, Ansible, and ArgoCD.
 
 ## Prerequisites
 
@@ -8,6 +8,7 @@ Before you begin, ensure you have the following:
 
 - **Git** — for cloning the repository
 - **Hetzner Cloud API Token** — create one in your Hetzner Cloud project under **Security > API Tokens**
+- **Google Cloud Platform account** — with billing enabled (required for GCP deployments)
 - **CLI tools** — install all required tools with one command (see below)
 
 ### Automated Tool Installation
@@ -363,3 +364,167 @@ terraform destroy
 ### Full Reference
 
 See the [architecture documentation](architecture.md#15-gcp-compute-engine-module) for the complete module reference (all variables, outputs, and configuration options). See the [runbooks](runbooks.md#gcp-vm-deployment) for operational procedures.
+
+## 7. Alternative: GCP GKE (Managed Kubernetes)
+
+For a fully managed Kubernetes experience on Google Cloud Platform, you can deploy a GKE cluster using the `gcp-gke` Terraform module. This is ideal for teams already using GCP who want a managed control plane with Autopilot mode for reduced operational overhead.
+
+### Prerequisites
+
+- **Google Cloud Platform account** — with billing enabled
+- **GCP project** — create one at [console.cloud.google.com](https://console.cloud.google.com)
+- **Google Cloud SDK (`gcloud`)** — authenticated with `gcloud auth login` and `gcloud auth application-default login`
+- **CLI tools** — `make install-tools` installs Terraform (the GCP provider is downloaded automatically)
+
+### Provision the GKE Cluster
+
+```bash
+cd terraform/environments/gcp-gke
+
+# Copy and edit the example vars
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Edit `terraform.tfvars` with your GCP project ID:
+
+```hcl
+project_id = "my-gcp-project"       # Required: your GCP project ID
+region     = "us-central1"          # Optional: GCP region
+cluster_name = "argus-cluster"      # Optional: cluster name
+enable_autopilot = true             # Optional: enable Autopilot mode (default: true)
+```
+
+Initialize and apply:
+
+```bash
+terraform init
+terraform plan
+terraform apply
+```
+
+### Configure kubectl
+
+After the cluster is provisioned, configure kubectl to connect to it:
+
+```bash
+# Using the terraform output
+gcloud container clusters get-credentials $(terraform output -raw cluster_name) --region=us-central1
+
+# Or directly (if you know the cluster name)
+gcloud container clusters get-credentials argus-cluster --region=us-central1
+```
+
+### Verify the Cluster
+
+```bash
+kubectl get nodes
+```
+
+All nodes should show `Ready`. The cluster comes with the following Helm repositories pre-configured:
+
+| Name | URL |
+|------|-----|
+| argo | `https://argoproj.github.io/argo-helm` |
+| traefik | `https://traefik.github.io/charts` |
+| prometheus-community | `https://prometheus-community.github.io/helm-charts` |
+| grafana | `https://grafana.github.io/helm-charts` |
+| jetstack | `https://charts.jetstack.io` |
+| external-secrets | `https://charts.external-secrets.io` |
+
+### Destroy the Cluster
+
+```bash
+cd terraform/environments/gcp-gke
+terraform destroy
+```
+
+> **Warning:** `terraform destroy` will delete the GKE cluster and all associated resources (node pools, networks, etc.). Cluster data is lost unless you have backups.
+
+### Full Reference
+
+See the [architecture documentation](architecture.md#16-gcp-gke-module) for the complete module reference (all variables, outputs, and configuration options).
+
+## 7. Alternative: GCP GKE (Managed Kubernetes)
+
+For a fully managed Kubernetes cluster on Google Cloud Platform, Argus Infra includes a Terraform module for deploying a GKE cluster with Autopilot mode. This eliminates the need to manage control plane nodes or worker VMs.
+
+### Prerequisites
+
+- **Google Cloud Platform account** — with billing enabled
+- **GCP project** — create one at [console.cloud.google.com](https://console.cloud.google.com)
+- **Google Cloud SDK (`gcloud`)** — for authenticating with GCP and configuring kubectl
+- **CLI tools** — `make install-tools` installs Terraform (the GCP provider is downloaded automatically)
+
+### Provision the GKE Cluster
+
+```bash
+cd terraform/environments/gcp-gke
+
+# Copy and edit the example vars
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Edit `terraform.tfvars` with your GCP project ID:
+
+```hcl
+project_id = "my-gcp-project"       # Required: your GCP project ID
+# region           = "us-central1"  # Optional: GCP region
+# cluster_name     = "argus-cluster" # Optional: cluster name
+# enable_autopilot = true           # Optional: Autopilot mode (default: true)
+# release_channel  = "REGULAR"      # Optional: GKE release channel
+```
+
+Initialize and apply:
+
+```bash
+terraform init
+terraform plan
+terraform apply
+```
+
+### Configure kubectl
+
+After the cluster is created, configure kubectl to point to your new GKE cluster:
+
+```bash
+# Using the output command
+$(terraform output -raw kubectl_configure_command)
+
+# Or manually using gcloud
+gcloud container clusters get-credentials argus-cluster --region us-central1 --project my-gcp-project
+```
+
+### Verify the Cluster
+
+```bash
+kubectl get nodes
+# All nodes should show Ready state
+kubectl get pods -A
+# CoreDNS and other system pods should be running
+```
+
+### Default Helm Repos
+
+The GKE module automatically adds the following Helm repositories after cluster creation:
+
+| Name | URL |
+|------|-----|
+| argo | `https://argoproj.github.io/argo-helm` |
+| traefik | `https://traefik.github.io/charts` |
+| prometheus-community | `https://prometheus-community.github.io/helm-charts` |
+| grafana | `https://grafana.github.io/helm-charts` |
+| jetstack | `https://charts.jetstack.io` |
+| external-secrets | `https://charts.external-secrets.io` |
+
+### Destroy the Cluster
+
+```bash
+cd terraform/environments/gcp-gke
+terraform destroy
+```
+
+> **Warning:** `terraform destroy` will delete the GKE cluster and all associated resources (nodes, disks, load balancers). Persistent volumes and their data will be lost unless backed up.
+
+### Full Reference
+
+See the [architecture documentation](architecture.md#16-gcp-gke-module) for the complete module reference (all variables, outputs, and configuration options). See the [runbooks](runbooks.md#gcp-gke-deployment) for operational procedures.
