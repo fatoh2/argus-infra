@@ -342,7 +342,7 @@ If you have access to a running cluster, you can run additional checks:
 These scripts are also run automatically via GitHub Actions:
 - **Sanity Checks** — on every PR to `develop` or `main`, and on push to those branches
 - **CD Deploy** — on every merge to `main`, validates and triggers ArgoCD sync
-- **Cluster Sanity** — every 6 hours via scheduled workflow (requires `CLUSTER_SANITY_ENABLED` repository variable)
+- **Cluster Sanity** — every 6 hours via scheduled workflow (gate job prevents false failures when `CLUSTER_SANITY_ENABLED` is not set)
 
 ## Next Steps
 
@@ -495,7 +495,7 @@ If you have access to a running cluster, you can run additional checks:
 These scripts are also run automatically via GitHub Actions:
 - **Sanity Checks** — on every PR to `develop` or `main`, and on push to those branches
 - **CD Deploy** — on every merge to `main`, validates and triggers ArgoCD sync
-- **Cluster Sanity** — every 6 hours via scheduled workflow (requires `CLUSTER_SANITY_ENABLED` repository variable)
+- **Cluster Sanity** — every 6 hours via scheduled workflow (gate job prevents false failures when `CLUSTER_SANITY_ENABLED` is not set)
 
 ## Next Steps
 

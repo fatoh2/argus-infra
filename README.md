@@ -72,7 +72,7 @@ argus-infra/
 └── .github/workflows/     # CI/CD pipeline
     ├── sanity-checks.yml  # PR-level Terraform + Ansible validation (CI)
     ├── cd-deploy.yml      # CD pipeline (lint → build → ArgoCD sync)
-    └── cluster-sanity.yml # Cluster-level health checks (scheduled, conditionally enabled)
+    └── cluster-sanity.yml # Cluster-level health checks (scheduled, gate job prevents false failures when disabled)
 ```
 
 ## CI/CD Pipeline
