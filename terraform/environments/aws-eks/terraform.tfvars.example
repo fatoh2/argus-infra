@@ -1,0 +1,39 @@
+# =============================================================================
+# Argus Infra — AWS EKS Environment Variables
+# =============================================================================
+# Copy this file to terraform.tfvars and fill in your values.
+#
+#   cp terraform.tfvars.example terraform.tfvars
+#   terraform init
+#   terraform plan
+#   terraform apply
+# =============================================================================
+
+# --- Core ---
+# cluster_name   = "argus-cluster"
+# region         = "us-east-1"
+# environment    = "production"
+# cluster_version = "1.31"
+
+# --- Networking ---
+# vpc_cidr           = "10.0.0.0/16"
+# availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
+# enable_nat_gateway = true
+
+# --- Node Group ---
+# num_nodes           = 3
+# min_nodes           = 1
+# max_nodes           = 10
+# node_instance_types = ["t3.xlarge"]
+# node_disk_size      = 100
+
+# --- SSH (optional) ---
+# node_ssh_key_name = "my-ec2-key-pair"
+# enable_node_ssh   = false
+
+# --- Logging ---
+# enabled_cluster_log_types = ["api", "audit", "authenticator"]
+
+# --- kubeconfig ---
+# generate_kubeconfig = true
+# kubeconfig_path     = "~/.kube/config-argus-cluster"
