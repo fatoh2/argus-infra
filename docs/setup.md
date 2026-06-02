@@ -305,6 +305,38 @@ kubectl describe pod -n monitoring | grep -i "violates PodSecurity"
 
 If any pods fail to start due to Pod Security violations, refer to the [runbooks](runbooks.md#pod-security-standards-troubleshooting) for remediation steps.
 
+### 4.6 Configure External Secrets Operator (Doppler)
+
+After ArgoCD syncs the `external-secrets` application, configure Doppler authentication:
+
+1. **Create a Doppler service token:**
+   - Go to [Doppler Dashboard](https://dashboard.doppler.com) → your project → config → **Tokens**
+   - Create a **Service Token** with read access
+
+2. **Apply the Doppler auth secret** (replace with your actual token):
+
+   ```bash
+   kubectl create secret generic doppler-auth      --namespace external-secrets-operator      --from-literal=token='dp.st.your_token_here'      --dry-run=client -o yaml | kubectl apply -f -
+   ```
+
+3. **Verify the SecretStore is Ready:**
+
+   ```bash
+   kubectl get secretstore -n default doppler-backend -o jsonpath='{.status.conditions[0].type}'
+   # Should output: Ready
+   ```
+
+4. **Verify secrets are syncing:**
+
+   ```bash
+   kubectl get externalsecret -n default example-app-secret -o wide
+   kubectl get secret -n default example-app-secret
+   ```
+
+> **Security note:** The `doppler-auth` secret is never committed to the repository. The file `k8s/external-secrets/doppler-auth-secret.yaml` contains a placeholder only — always apply the real token manually.
+
+See [docs/secrets.md](secrets.md) for detailed setup, verification, and troubleshooting.
+
 ## 5. Running Sanity Checks
 
 The repository includes a local sanity check suite to validate changes before committing. Run it from the repository root:

@@ -65,6 +65,13 @@ argus-infra/
 │   │   ├── network-policies/  # Default deny + explicit allow rules
 │   │   ├── pod-security/      # Pod Security Standards (restricted profile)
 │   │   └── rbac/              # Least-privilege ServiceAccounts
+│   ├── external-secrets/  # External Secrets Operator + Doppler
+│   │   ├── helm-repository.yaml
+│   │   ├── helm-release.yaml
+│   │   ├── secretstore.yaml
+│   │   ├── doppler-auth-secret.yaml
+│   │   ├── example-external-secret.yaml
+│   │   └── kustomization.yaml
 │   └── cluster-issuer/     # Let's Encrypt ClusterIssuers
 ├── scripts/                # Operational and CI scripts
 │   ├── run-sanity-checks.sh   # Local sanity suite (Terraform, Ansible, ArgoCD)
@@ -73,6 +80,7 @@ argus-infra/
 ├── docs/                   # Documentation
 │   ├── cicd.md             # CI/CD pipeline overview
 │   ├── architecture.md     # System architecture
+│   ├── secrets.md          # Secret management with ESO + Doppler
 │   ├── runbooks.md         # Operational runbooks
 │   ├── setup.md            # Setup guide
 │   └── adr/                # Architecture Decision Records

@@ -300,6 +300,18 @@ Secrets are managed via Doppler. To rotate a secret:
    kubectl rollout restart deployment/<name> -n <namespace>
    ```
 
+### External Secrets Operator Troubleshooting
+
+| Symptom | Likely Cause | Fix |
+|---------|-------------|------|
+| SecretStore not Ready | Invalid or missing Doppler token | Check `doppler-auth` secret in `external-secrets-operator` namespace: `kubectl get secret -n external-secrets-operator doppler-auth -o jsonpath='{.data.token}' \| base64 -d` |
+| ExternalSecret not syncing | SecretStore not Ready | Check SecretStore status: `kubectl get secretstore -n default doppler-backend -o wide` |
+| Secret not created | Namespace mismatch | Ensure ExternalSecret and SecretStore are in the same namespace (or use a ClusterSecretStore) |
+| ESO pod crash looping | Resource limits too low | Check pod logs: `kubectl logs -n external-secrets-operator deployment/external-secrets` |
+| Secret value is stale | refreshInterval not elapsed | Force a refresh by deleting the ExternalSecret pod or waiting for the next sync interval (default: 1h) |
+
+See [docs/secrets.md](secrets.md) for complete setup and verification steps.
+
 ### Pod Security Violations
 If a pod is rejected due to Pod Security Standards:
 1. Check the violation details: `kubectl describe pod <pod> -n <namespace>`
