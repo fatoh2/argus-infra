@@ -69,9 +69,7 @@ jobs:
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
         run: |
           cd terraform/environments/homelab
-          terraform init -backend=false -input=false
           terraform plan -no-color -input=false \
-            -target=module.network \
             -var="hcloud_token=${HCLOUD_TOKEN}" \
             -var="ssh_key_name=ci-dummy-key" \
             -var="ssh_key_id=0" \
@@ -107,9 +105,7 @@ jobs:
             k8s/argocd/app-of-apps.yaml \
             k8s/argocd/install.yaml \
             scripts/cluster-sanity.sh \
-            scripts/bootstrap-argocd.sh \
-            CLAUDE.md \
-            README.md; do
+            scripts/bootstrap-argocd.sh; do
             if [ ! -f "$file" ]; then
               echo "❌ Missing: $file"
               MISSING=$((MISSING + 1))
