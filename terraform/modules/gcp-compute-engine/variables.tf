@@ -84,7 +84,7 @@ variable "tags" {
 variable "labels" {
   description = "GCP resource labels to apply to all created resources."
   type        = map(string)
-  default     = {
+  default = {
     project = "argus"
     managed = "terraform"
   }
