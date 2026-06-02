@@ -12,13 +12,13 @@ Before you begin, ensure you have the following:
 
 ### Automated Tool Installation
 
-The recommended way to install all required CLI tools is via the provided script:
+The recommended way to install all required CLI tools is via the Makefile:
 
 ```bash
-bash scripts/install-tools.sh
+make install-tools
 ```
 
-This installs (or skips if already present):
+This is equivalent to running `bash scripts/install-tools.sh` and installs (or skips if already present):
 
 | Tool | Version | Purpose |
 |------|---------|---------|
@@ -37,12 +37,18 @@ The script also installs required Ansible Galaxy collections from `ansible/requi
 To verify all tools are installed correctly:
 
 ```bash
+make check-versions
+```
+
+Or directly:
+
+```bash
 bash scripts/versions.sh
 ```
 
 ### Manual Installation (if needed)
 
-If you prefer to install tools individually:
+If you prefer to install tools individually, refer to each tool's official documentation.
 
 ## 1. Clone the Repository
 
@@ -159,7 +165,7 @@ all:
 
 ### Run Playbook
 
-> **Note:** If you used `scripts/install-tools.sh`, Ansible Galaxy collections are already installed. Skip to running the playbook.
+> **Note:** If you used `make install-tools` (or `scripts/install-tools.sh`), Ansible Galaxy collections are already installed. Skip to running the playbook.
 
 Install required Ansible Galaxy collections (if not already done):
 
@@ -220,316 +226,70 @@ kubectl -n argocd wait --for=condition=ready pod --all --timeout=300s
 
 ### Access the ArgoCD UI
 
-By default, the ArgoCD API server is not exposed externally. To access the UI, you can port-forward:
+By default, the ArgoCD API server is exposed via a `ClusterIP` service. To access the UI, you can port-forward:
 
 ```bash
-kubectl port-forward -n argocd svc/argocd-server 8080:443
+kubectl port-forward -n argocd service/argocd-server 8080:443
 ```
 
-Then open https://localhost:8080 in your browser.
+Then open `https://localhost:8080` in your browser.
 
-### Get ArgoCD Initial Password
-
-Retrieve the initial admin password:
+The default username is `admin`. Retrieve the initial password:
 
 ```bash
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 ```
 
-> **Security note:** This command prints the password to your terminal. In a shared or CI environment, be mindful of terminal logging. Consider storing it in a password manager immediately after first login.
+### Configure ArgoCD with Git Repository
 
-Log in to the ArgoCD UI or CLI with:
-- **Username:** `admin`
-- **Password:** (the output of the command above)
+1. Log in to the ArgoCD UI or CLI
+2. Add your Git repository:
+   ```bash
+   argocd repo add git@github.com:fatoh2/argus-infra.git --ssh-private-key-path ~/.ssh/argus_homelab
+   ```
+3. Create the root application:
+   ```bash
+   argocd app create argocd-root \
+     --repo git@github.com:fatoh2/argus-infra.git \
+     --path k8s/argocd \
+     --dest-server https://kubernetes.default.svc \
+     --dest-namespace argocd \
+     --sync-policy automated
+   ```
 
-For CLI login (requires ArgoCD CLI — optional, only needed if you prefer CLI over the Web UI):
+ArgoCD will now sync all applications defined in `k8s/argocd/apps/` to the cluster.
+
+## 5. Verify the Cluster
+
+### Check Node Status
 
 ```bash
-argocd login localhost:8080 --username admin --password $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
+kubectl get nodes
 ```
 
-### Deploy ArgoCD Applications
+All nodes should show `Ready`.
 
-ArgoCD applications are defined in the `k8s/argocd/apps/` directory. The root application (`app-of-apps.yaml`) manages all child applications.
-
-
-To deploy, apply the root application manifest:
+### Check System Pods
 
 ```bash
-kubectl apply -f k8s/argocd/app-of-apps.yaml
-```
-
-ArgoCD will automatically detect the new application and sync it, deploying all child applications defined in `k8s/argocd/apps/`.
-
-
-### 4.3 Access Grafana
-
-After ArgoCD syncs the Grafana application, Grafana will be available at `https://grafana.argus.local`.
-
-1.  **Verify Grafana is running**:
-    ```bash
-    kubectl get pods -n monitoring -l app=grafana
-    ```
-    Wait until the pod shows `Running` and `READY 1/1`.
-
-2.  **Check the Ingress**:
-    ```bash
-    kubectl get ingress -n monitoring grafana
-    ```
-    The ingress should show the host `grafana.argus.local` with the Traefik ingress class.
-
-3.  **Access Grafana**:
-    - If DNS is configured, open `https://grafana.argus.local` in your browser.
-    - If DNS is not configured, add a hosts file entry:
-      ```
-      <CLUSTER_IP>  grafana.argus.local
-      ```
-      Where `<CLUSTER_IP>` is the IP of any cluster node (or the Traefik load balancer IP).
-
-4.  **Log in** with the default credentials:
-    - **Username:** `admin`
-    - **Password:** `admin`
-    
-    > **Security note:** Change the default password on first login. For production use, configure a secure password via Doppler and External Secrets Operator.
-
-5.  **Verify the Prometheus datasource**:
-    - Go to **Configuration > Data Sources** in the Grafana UI.
-    - The Prometheus datasource should be pre-configured and show a green "Data source is working" badge.
-
-6.  **Explore provisioned dashboards**:
-    - Go to **Dashboards > Browse**.
-    - You should see two provisioned dashboards: **Node Exporter Full** and **Kubernetes Cluster Overview**.
-    - Open a dashboard and verify it shows metrics from the cluster.
-
-### 4.4 Deploy Pod Security Standards
-
-After the cluster applications are deployed, enforce Pod Security Standards (restricted profile) on all application namespaces:
-
-```bash
-# Apply namespace labels for restricted profile
-kubectl apply -f k8s/security/pod-security/
-
-# Verify enforcement
-kubectl describe ns monitoring
-# Should show: pod-security.kubernetes.io/enforce: restricted
-```
-
-This labels the following namespaces with `pod-security.kubernetes.io/enforce: restricted`:
-- `monitoring` — Prometheus, Grafana, Loki, Promtail
-- `databases` — PostgreSQL, Redis
-- `ingress` — Traefik, cert-manager, wildcard TLS
-- `traefik` — Traefik ingress controller
-- `cert-manager` — cert-manager operator
-- `default` — General application workloads
-
-> **Note:** The `kube-system` and `argocd` namespaces are intentionally excluded from the restricted profile, as system-level components may require elevated privileges.
-
-### 4.5 Verify Workload Compliance
-
-After applying the restricted profile, verify that all existing workloads comply:
-
-```bash
-# Check all pods are running
 kubectl get pods -A
-
-# Check for any admission controller rejections
-kubectl describe pod -n monitoring | grep -i "violates PodSecurity"
 ```
 
-If any pods fail to start due to Pod Security violations, refer to the [runbooks](runbooks.md#pod-security-standards-troubleshooting) for remediation steps.
-
-## 5. Running Sanity Checks
-
-The repository includes a local sanity check suite to validate changes before committing. Run it from the repository root:
+### Run Local Sanity Checks
 
 ```bash
-# Basic sanity check (Terraform validate + fmt, Ansible syntax check + lint, file structure)
-./scripts/run-sanity-checks.sh
-
-# With verbose output
-./scripts/run-sanity-checks.sh --verbose
-
-# Skip ansible-lint (useful if not installed)
-./scripts/run-sanity-checks.sh --skip-ansible-lint
+make sanity
 ```
 
-The sanity suite performs:
-- **Terraform**: `init -backend=false`, `validate`, `fmt -check -recursive`, `plan` (syntax-only, no apply)
-- **Ansible**: `--syntax-check` on `site.yml` with CI inventory, `ansible-lint` on playbooks/roles
-- **File structure**: verifies all critical files exist (Terraform configs, Ansible playbooks, ArgoCD manifests)
-- **ArgoCD**: kubectl dry-run validation of manifests (if a cluster is available)
-
-### Cluster-Level Checks (with a running cluster)
-
-If you have access to a running cluster, you can run additional checks:
+Or directly:
 
 ```bash
-# Full cluster sanity (nodes, pods, ArgoCD apps, ingress)
-./scripts/cluster-sanity.sh --verbose
-
-# ArgoCD-specific health check
-./scripts/argocd-health.sh --verbose
+bash scripts/run-sanity-checks.sh
 ```
-
-These scripts are also run automatically via GitHub Actions:
-- **Sanity Checks** — on every PR to `develop` or `main`, and on push to those branches
-- **CD Deploy** — on every merge to `main`, validates and triggers ArgoCD sync
-- **Cluster Sanity** — every 6 hours via scheduled workflow (gate job prevents false failures when `CLUSTER_SANITY_ENABLED` is not set)
 
 ## Next Steps
 
-
-
-ArgoCD will automatically detect the new application and sync it, deploying all child applications defined in `k8s/argocd/apps/`.
-
-
-### 4.3 Access Grafana
-
-After ArgoCD syncs the Grafana application, Grafana will be available at `https://grafana.argus.local`.
-
-1.  **Verify Grafana is running**:
-    ```bash
-    kubectl get pods -n monitoring -l app=grafana
-    ```
-    Wait until the pod shows `Running` and `READY 1/1`.
-
-2.  **Check the Ingress**:
-    ```bash
-    kubectl get ingress -n monitoring grafana
-    ```
-    The ingress should show the host `grafana.argus.local` with the Traefik ingress class.
-
-3.  **Access Grafana**:
-    - If DNS is configured, open `https://grafana.argus.local` in your browser.
-    - If DNS is not configured, add a hosts file entry:
-      ```
-      <CLUSTER_IP>  grafana.argus.local
-      ```
-      Where `<CLUSTER_IP>` is the IP of any cluster node (or the Traefik load balancer IP).
-
-4.  **Log in** with the default credentials:
-    - **Username:** `admin`
-    - **Password:** `admin`
-    
-    > **Security note:** Change the default password on first login. For production use, configure a secure password via Doppler and External Secrets Operator.
-
-5.  **Verify the Prometheus datasource**:
-    - Go to **Configuration > Data Sources** in the Grafana UI.
-    - The Prometheus datasource should be pre-configured and show a green "Data source is working" badge.
-
-6.  **Explore provisioned dashboards**:
-    - Go to **Dashboards > Browse**.
-    - You should see two provisioned dashboards: **Node Exporter Full** and **Kubernetes Cluster Overview**.
-    - Open a dashboard and verify it shows metrics from the cluster.
-
-### 4.4 Deploy Pod Security Standards
-
-After the cluster applications are deployed, enforce Pod Security Standards (restricted profile) on all application namespaces:
-
-```bash
-# Apply namespace labels for restricted profile
-kubectl apply -f k8s/security/pod-security/
-
-# Verify enforcement
-kubectl describe ns monitoring
-# Should show: pod-security.kubernetes.io/enforce: restricted
-```
-
-This labels the following namespaces with `pod-security.kubernetes.io/enforce: restricted`:
-- `monitoring` — Prometheus, Grafana, Loki, Promtail
-- `databases` — PostgreSQL, Redis
-- `ingress` — Traefik, cert-manager, wildcard TLS
-- `traefik` — Traefik ingress controller
-- `cert-manager` — cert-manager operator
-- `default` — General application workloads
-
-> **Note:** The `kube-system` and `argocd` namespaces are intentionally excluded from the restricted profile, as system-level components may require elevated privileges.
-
-### 4.5 Verify Workload Compliance
-
-After applying the restricted profile, verify that all existing workloads comply:
-
-```bash
-# Check all pods are running
-kubectl get pods -A
-
-# Check for any admission controller rejections
-kubectl describe pod -n monitoring | grep -i "violates PodSecurity"
-```
-
-If any pods fail to start due to Pod Security violations, refer to the [runbooks](runbooks.md#pod-security-standards-troubleshooting) for remediation steps.
-
-### 4.6 Configure External Secrets Operator (Doppler)
-
-After ArgoCD syncs the `external-secrets` application, configure Doppler authentication:
-
-1. **Create a Doppler service token:**
-   - Go to [Doppler Dashboard](https://dashboard.doppler.com) → your project → config → **Tokens**
-   - Create a **Service Token** with read access
-
-2. **Apply the Doppler auth secret** (replace with your actual token):
-
-   ```bash
-   kubectl create secret generic doppler-auth      --namespace external-secrets-operator      --from-literal=token='dp.st.your_token_here'      --dry-run=client -o yaml | kubectl apply -f -
-   ```
-
-3. **Verify the SecretStore is Ready:**
-
-   ```bash
-   kubectl get secretstore -n default doppler-backend -o jsonpath='{.status.conditions[0].type}'
-   # Should output: Ready
-   ```
-
-4. **Verify secrets are syncing:**
-
-   ```bash
-   kubectl get externalsecret -n default example-app-secret -o wide
-   kubectl get secret -n default example-app-secret
-   ```
-
-> **Security note:** The `doppler-auth` secret is never committed to the repository. The file `k8s/external-secrets/doppler-auth-secret.yaml` contains a placeholder only — always apply the real token manually.
-
-See [docs/secrets.md](secrets.md) for detailed setup, verification, and troubleshooting.
-
-## 5. Running Sanity Checks
-
-The repository includes a local sanity check suite to validate changes before committing. Run it from the repository root:
-
-```bash
-# Basic sanity check (Terraform validate + fmt, Ansible syntax check + lint, file structure)
-./scripts/run-sanity-checks.sh
-
-# With verbose output
-./scripts/run-sanity-checks.sh --verbose
-
-# Skip ansible-lint (useful if not installed)
-./scripts/run-sanity-checks.sh --skip-ansible-lint
-```
-
-The sanity suite performs:
-- **Terraform**: `init -backend=false`, `validate`, `fmt -check -recursive`, `plan` (syntax-only, no apply)
-- **Ansible**: `--syntax-check` on `site.yml` with CI inventory, `ansible-lint` on playbooks/roles
-- **File structure**: verifies all critical files exist (Terraform configs, Ansible playbooks, ArgoCD manifests)
-- **ArgoCD**: kubectl dry-run validation of manifests (if a cluster is available)
-
-### Cluster-Level Checks (with a running cluster)
-
-If you have access to a running cluster, you can run additional checks:
-
-```bash
-# Full cluster sanity (nodes, pods, ArgoCD apps, ingress)
-./scripts/cluster-sanity.sh --verbose
-
-# ArgoCD-specific health check
-./scripts/argocd-health.sh --verbose
-```
-
-These scripts are also run automatically via GitHub Actions:
-- **Sanity Checks** — on every PR to `develop` or `main`, and on push to those branches
-- **CD Deploy** — on every merge to `main`, validates and triggers ArgoCD sync
-- **Cluster Sanity** — every 6 hours via scheduled workflow (gate job prevents false failures when `CLUSTER_SANITY_ENABLED` is not set)
-
-## Next Steps
-
->>>>>>> origin/main
-After the cluster is running and ArgoCD is deployed, the platform is ready for application deployments. See the [architecture document](architecture.md) for details on how components interact, and the [CI/CD pipeline documentation](cicd.md) for how changes flow from Git to the cluster.
+- Review the [Architecture](docs/architecture.md) document for a deep dive into component design
+- Check the [CI/CD Pipeline](docs/cicd.md) for how changes are validated and deployed
+- See the [Runbooks](docs/runbooks.md) for operational procedures
+- Browse [Architecture Decision Records](docs/adr/) for design rationale

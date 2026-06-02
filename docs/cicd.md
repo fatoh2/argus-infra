@@ -6,6 +6,9 @@ Argus Infra uses a three-stage CI/CD pipeline:
 2. **Build** — infrastructure compilation checks (terraform validate + plan, guarded to skip gracefully when directories or secrets are absent)
 3. **Deploy** — ArgoCD GitOps sync (path-filtered; docs-only pushes are skipped automatically)
 
+> **Local equivalent:** Run `make lint` for lint checks, `make validate` for Terraform validation,
+> and `make sanity` for the full local suite. See the [Makefile](../Makefile) for all available targets.
+
 ## CI: Pull Request Validation
 
 **File:** `.github/workflows/sanity-checks.yml`
@@ -57,6 +60,8 @@ Runs three sequential stages:
 | Terraform Plan | Dry-run plan to verify configuration compiles end-to-end | Skips if `terraform/environments/homelab` doesn't exist; also skips gracefully if `HCLOUD_TOKEN` secret is not configured (prints a message and exits 0) |
 
 > **Note:** The Terraform plan step no longer requires `HCLOUD_TOKEN` to be set. If the token is absent, it prints a warning and exits successfully. This allows the workflow to pass even when cloud credentials aren't configured yet (e.g., during initial repo setup).
+>
+> **Fork PRs:** When a PR comes from a fork, GitHub Actions secrets are unavailable. The workflow uses a dummy token and `-backend=false` to validate configuration syntax without making real API calls. The actual plan with real credentials runs in `cd-deploy.yml` (main branch only).
 
 ### Stage 3: Deploy
 

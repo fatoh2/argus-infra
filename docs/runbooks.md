@@ -10,10 +10,11 @@ Before working with the repo, install all required CLI tools:
 
 ```bash
 # Install everything (Terraform, Ansible, kubectl, Helm, ArgoCD CLI, k3d, kubeseal)
-bash scripts/install-tools.sh
+make install-tools
 
-# Quiet mode (minimal output)
-bash scripts/install-tools.sh --quiet
+# Or run the script directly (supports --quiet flag):
+bash scripts/install-tools.sh
+bash scripts/install-tools.sh --quiet   # minimal output
 ```
 
 The script is idempotent — re-running it skips already-installed tools. It targets Ubuntu/Debian 22.04+ and requires `sudo` access for binary installation to `/usr/local/bin/`.
@@ -23,6 +24,8 @@ The script is idempotent — re-running it skips already-installed tools. It tar
 To verify all tools are installed and see their versions:
 
 ```bash
+make check-versions
+# or directly:
 bash scripts/versions.sh
 ```
 
@@ -41,6 +44,24 @@ This prints versions for all tools plus Ansible collection versions and system i
 | kubeseal | latest | GitHub releases |
 
 The script also installs required Ansible Galaxy collections from `ansible/requirements.yml` and `kubernetes.core`.
+
+### Makefile Quick Reference
+
+The root `Makefile` provides convenient shortcuts for common operations:
+
+| Command | What it does |
+|---------|-------------|
+| `make help` | Print all available targets |
+| `make lint` | Terraform fmt -check + ansible-lint + shellcheck |
+| `make validate` | Terraform init (no backend) + validate |
+| `make plan` | Terraform plan (requires `HCLOUD_TOKEN`) |
+| `make install-tools` | Install CLI tools (delegates to `scripts/install-tools.sh`) |
+| `make local-up` | Spin up local k3d cluster |
+| `make local-down` | Tear down local k3d cluster |
+| `make check-versions` | Print installed tool versions |
+| `make sanity` | Run full local sanity check suite |
+
+All targets gracefully skip missing tools. Run `make` (or `make help`) to see the full list.
 
 ## 2. Deployment
 New deployments or updates to the infrastructure are primarily driven by changes in the Terraform or Ansible configurations, followed by ArgoCD syncing Kubernetes manifests.

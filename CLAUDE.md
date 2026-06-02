@@ -60,7 +60,7 @@ scripts/
 - **ALWAYS** run `terraform plan` and include the full diff in your PR description
 - **ALWAYS** run `helm lint` before committing chart changes
 - **ALWAYS** update `docs/runbooks.md` when adding or changing operational procedures
-- **ALWAYS** run `./scripts/run-sanity-checks.sh` before opening a PR to catch issues early
+- **ALWAYS** run `make sanity` (or `./scripts/run-sanity-checks.sh` directly) before opening a PR to catch issues early
 
 ## PR Format
 ```
@@ -84,7 +84,7 @@ Body:
 - [ ] terraform plan reviewed
 - [ ] No secrets in diff
 - [ ] Runbook updated (if applicable)
-- [ ] Local sanity checks passed (./scripts/run-sanity-checks.sh)
+- [ ] Local sanity checks passed (make sanity or ./scripts/run-sanity-checks.sh)
 - [ ] Resource limits set on all new pods
 ```
 
