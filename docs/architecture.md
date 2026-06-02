@@ -4,9 +4,9 @@ This document provides an in-depth explanation of the Argus Infra components and
 
 ## 1. Overview
 
-Argus Infra is a fully GitOps-driven Kubernetes homelab platform running on Hetzner Cloud. The architecture follows a layered approach:
+Argus Infra is a fully GitOps-driven Kubernetes homelab platform running on Hetzner Cloud, with additional deployment options on GCP (Compute Engine, GKE) and AWS (EC2). The architecture follows a layered approach:
 
-1. **Infrastructure** — Hetzner Cloud VMs provisioned via Terraform
+1. **Infrastructure** — Hetzner Cloud VMs, GCP Compute Engine VMs, GKE clusters, or AWS EC2 instances provisioned via Terraform
 2. **Cluster** — k3s installed and configured via Ansible
 3. **GitOps** — ArgoCD manages all Kubernetes workloads declaratively
 4. **Ingress & TLS** — Traefik + cert-manager for routing and automatic certificates
@@ -266,3 +266,289 @@ See [docs/runbooks.md](runbooks.md) for detailed restore procedures, including:
 - **Cluster Autoscaling:** Implement cluster autoscaler to automatically add/remove worker nodes based on resource utilization.
 - **Service Mesh:** Evaluate Istio or Linkerd for advanced traffic management, observability, and security features.
 - **Disaster Recovery:** Implement cross-region backup and recovery for the entire cluster state.
+
+## 15. GCP Compute Engine Module
+
+Argus Infra includes a Terraform module for deploying a single VM on Google Cloud Platform (GCP). This is useful for lightweight deployments, testing, or running Argus components that don't require a full Kubernetes cluster.
+
+### Module: `modules/gcp-compute-engine`
+
+The GCP Compute Engine module provisions:
+
+- **Compute Engine VM** — Ubuntu 22.04 LTS with configurable machine type and disk size
+- **Firewall Rules** — SSH (22), HTTP (80), and HTTPS (443) with configurable source CIDR ranges
+- **External IP** — Optional ephemeral public IP address
+- **Startup Script** — Installs Docker and Docker Compose on first boot
+
+### Usage
+
+```hcl
+module "argus_vm" {
+  source = "../../modules/gcp-compute-engine"
+
+  project_id      = "my-gcp-project"
+  name            = "argus-vm"
+  region          = "us-central1"
+  machine_type    = "e2-standard-4"
+  boot_disk_size  = 100
+  enable_public_ip = true
+
+  ssh_public_key = var.ssh_public_key
+  ssh_user       = "argus"
+
+  tags = ["argus", "argus-vm", "http-server", "https-server"]
+
+  labels = {
+    project = "argus"
+    env     = "production"
+  }
+
+  create_firewall_rules = true
+}
+```
+
+### Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `project_id` | (required) | GCP project ID |
+| `name` | `argus-vm` | VM instance name |
+| `region` | `us-central1` | GCP region |
+| `zone` | `null` (auto) | GCP zone |
+| `machine_type` | `e2-standard-4` | Machine type |
+| `boot_disk_size` | `100` | Boot disk size (GB) |
+| `boot_disk_type` | `pd-standard` | Disk type |
+| `boot_disk_image` | `ubuntu-os-cloud/ubuntu-2204-lts` | OS image |
+| `enable_public_ip` | `true` | Assign external IP |
+| `ssh_public_key` | `null` | SSH public key content |
+| `ssh_user` | `argus` | SSH username |
+| `create_firewall_rules` | `true` | Create SSH/HTTP/HTTPS rules |
+| `allowed_ssh_cidrs` | `["0.0.0.0/0"]` | SSH source CIDRs |
+| `allowed_http_cidrs` | `["0.0.0.0/0"]` | HTTP source CIDRs |
+| `allowed_https_cidrs` | `["0.0.0.0/0"]` | HTTPS source CIDRs |
+
+### Outputs
+
+| Output | Description |
+|---|---|
+| `instance_id` | Instance ID |
+| `instance_name` | Instance name |
+| `instance_self_link` | Self-link (URI) of the instance |
+| `zone` | GCP zone where the instance was created |
+| `machine_type` | Machine type of the instance |
+| `network_ip` | Private IP address |
+| `nat_ip` | Public IP address (if enabled) |
+| `nat_ips` | List of external IPs assigned to the instance |
+| `instance_public_ip` | Alias for `nat_ip` — external public IP (if enabled) |
+| `ssh_command` | Ready-to-use SSH command |
+| `firewall_rule_names` | Created firewall rule names |
+
+### Quick Start
+
+```bash
+cd terraform/environments/gcp-single-vm
+
+# Copy and edit the example vars
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your GCP project ID and SSH key
+
+# Initialize and plan
+terraform init
+terraform plan
+
+# Apply
+terraform apply
+
+# Connect
+ssh argus@$(terraform output -raw instance_public_ip)
+```
+
+## 16. GCP GKE Module
+
+Argus Infra includes a Terraform module for deploying a Google Kubernetes Engine (GKE) cluster on GCP. This enables running Argus on a managed Kubernetes service with Autopilot mode for reduced operational overhead.
+
+### Module: `modules/gcp-gke/`
+
+**Purpose:** Provision a GKE cluster (Autopilot by default) with kubectl configured and Helm repositories pre-added.
+
+**Key Variables:**
+- `project_id` (required) — GCP project ID
+- `region` — GCP region (default: `us-central1`)
+- `cluster_name` — GKE cluster name (default: `argus-cluster`)
+- `num_nodes` — Node count for Standard mode (default: 3; ignored by Autopilot)
+- `node_machine_type` — Machine type for Standard mode (default: `e2-standard-4`; ignored by Autopilot)
+- `enable_autopilot` — Enable Autopilot mode (default: `true`)
+- `release_channel` — GKE release channel (default: `REGULAR`)
+- `network` / `subnetwork` — VPC configuration
+- `enable_private_endpoint` / `enable_private_nodes` — Private cluster settings
+- `deletion_protection` — Prevent accidental cluster deletion
+- `helm_repos` — Map of Helm repositories to add after cluster creation
+
+**Outputs:**
+
+| Output | Description |
+|---|---|
+| `cluster_id` | GKE cluster ID |
+| `cluster_name` | GKE cluster name |
+| `cluster_location` | Location (region or zone) of the GKE cluster |
+| `cluster_endpoint` | Cluster Kubernetes endpoint IP/DNS |
+| `cluster_ca_certificate` | Base64-encoded CA certificate (sensitive) |
+| `cluster_kubernetes_version` | Kubernetes version running on the cluster |
+| `cluster_autopilot_enabled` | Whether Autopilot mode is enabled |
+| `cluster_release_channel` | GKE release channel (REGULAR/RAPID/STABLE) |
+| `kubeconfig_path` | Path to generated kubeconfig file (if `generate_kubeconfig` is enabled) |
+| `kubeconfig_generated` | Whether a kubeconfig file was generated |
+| `kubectl_configure_command` | Command to configure kubectl for this cluster |
+| `network` | VPC network used by the cluster |
+| `subnetwork` | Subnetwork used by the cluster |
+| `cluster_self_link` | Self-link (URI) of the GKE cluster |
+| `node_pool_name` | Primary node pool name (Standard mode only) |
+| `node_pool_node_count` | Primary node pool node count (Standard mode only) |
+
+**Default Helm Repos Added:**
+| Name | URL |
+|------|-----|
+| argo | `https://argoproj.github.io/argo-helm` |
+| traefik | `https://traefik.github.io/charts` |
+| prometheus-community | `https://prometheus-community.github.io/helm-charts` |
+| grafana | `https://grafana.github.io/helm-charts` |
+| jetstack | `https://charts.jetstack.io` |
+| external-secrets | `https://charts.external-secrets.io` |
+
+**Usage:**
+```hcl
+module "argus_gke" {
+  source = "../../modules/gcp-gke"
+
+  project_id = var.project_id
+  region     = var.region
+
+  cluster_name      = "argus-cluster"
+  enable_autopilot  = true
+  release_channel   = "REGULAR"
+}
+```
+
+**Done when:** `kubectl get nodes` shows all nodes in Ready state.
+
+
+## 17. AWS EC2 Module
+
+Argus Infra includes a Terraform module for deploying a single EC2 instance on Amazon Web Services (AWS). This mirrors the GCP Compute Engine module and is useful for lightweight deployments, testing, or running Argus components on AWS without a full Kubernetes cluster.
+
+### Module: `modules/aws-ec2`
+
+The AWS EC2 module provisions:
+
+- **VPC** — Custom VPC (10.0.0.0/16) with DNS support and hostnames enabled
+- **Internet Gateway** — For public internet access
+- **Public Subnet** — In a configurable availability zone
+- **Route Table** — Default route to the Internet Gateway
+- **Security Group** — SSH (22), HTTP (80), and HTTPS (443) with configurable source CIDR ranges
+- **EC2 Instance** — Ubuntu 22.04 LTS with configurable instance type (default: t3.xlarge) and 100 GB gp3 root volume
+- **Elastic IP** — Static public IP address (optional, enabled by default)
+- **SSH Key Pair** — Injected from a provided public key
+- **IAM Role** — Optional IAM role with configurable policy attachments
+- **Startup Script** — Installs Docker and Docker Compose on first boot
+
+### Usage
+
+```hcl
+module "argus_ec2" {
+  source = "../../modules/aws-ec2"
+
+  name            = "argus-vm"
+  region          = "us-east-1"
+  instance_type   = "t3.xlarge"
+  root_volume_size = 100
+
+  ssh_public_key = var.ssh_public_key
+  ssh_user       = "argus"
+
+  enable_elastic_ip = true
+
+  tags = {
+    Name    = "argus-vm"
+    Project = "argus"
+    Env     = "production"
+  }
+}
+```
+
+### Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `name` | `argus-vm` | EC2 instance name |
+| `region` | `us-east-1` | AWS region |
+| `availability_zone` | `null` (auto) | AWS availability zone |
+| `instance_type` | `t3.xlarge` | EC2 instance type |
+| `root_volume_size` | `100` | Root volume size (GB) |
+| `root_volume_type` | `gp3` | Root volume type |
+| `ami_owner` | `099720109477` | Canonical (Ubuntu) AWS account ID |
+| `ami_name_filter` | `ubuntu/images/hvm-ssd-gp3/ubuntu-22.04-amd64-server-*` | AMI name filter |
+| `vpc_cidr` | `10.0.0.0/16` | VPC CIDR block |
+| `subnet_cidr` | `10.0.1.0/24` | Public subnet CIDR |
+| `enable_dns_hostnames` | `true` | Enable DNS hostnames in VPC |
+| `enable_elastic_ip` | `true` | Allocate and associate Elastic IP |
+| `ssh_public_key` | `null` | SSH public key content |
+| `ssh_user` | `argus` | SSH username |
+| `allowed_ssh_cidrs` | `["0.0.0.0/0"]` | SSH source CIDRs |
+| `allowed_http_cidrs` | `["0.0.0.0/0"]` | HTTP source CIDRs |
+| `allowed_https_cidrs` | `["0.0.0.0/0"]` | HTTPS source CIDRs |
+| `create_iam_role` | `false` | Create an IAM role for the instance |
+| `iam_role_name` | `argus-ec2-role` | IAM role name |
+| `iam_policy_arns` | `[]` | List of IAM policy ARNs to attach |
+| `tags` | `{}` | Resource tags |
+
+### Outputs
+
+| Output | Description |
+|---|---|
+| `instance_id` | EC2 instance ID |
+| `instance_arn` | EC2 instance ARN |
+| `instance_state` | EC2 instance state |
+| `instance_type` | EC2 instance type |
+| `public_ip` | Public IP address (Elastic IP if enabled, otherwise ephemeral) |
+| `instance_public_ip` | Alias for `public_ip` — public IP address (Elastic IP if enabled, otherwise ephemeral) |
+| `private_ip` | Private IP address |
+| `public_dns` | Public DNS name |
+| `vpc_id` | VPC ID |
+| `subnet_id` | Subnet ID |
+| `security_group_id` | Security group ID |
+| `ssh_command` | Ready-to-use SSH command |
+| `elastic_ip` | Elastic IP address (if enabled) |
+| `elastic_ip_allocation_id` | Elastic IP allocation ID |
+| `key_pair_name` | SSH key pair name |
+| `iam_role_name` | IAM role name (if created) |
+| `iam_role_arn` | IAM role ARN (if created) |
+
+### Quick Start
+
+```bash
+cd terraform/environments/aws-single-vm
+
+# Copy and edit the example vars
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your SSH public key
+
+# Initialize and plan
+terraform init
+terraform plan
+
+# Apply
+terraform apply
+
+# Connect
+ssh argus@$(terraform output -raw instance_public_ip)
+```
+
+### What the module does NOT do
+
+- It does **not** install Kubernetes or k3s — this is intentionally a single-VM module
+- It does **not** manage DNS records (Route53)
+- It does **not** provision additional EBS volumes beyond the root volume
+- It does **not** set up monitoring or observability
+- It does **not** create a VPC with private subnets or NAT gateways (single public subnet only)
+
+These are left to the user or future enhancements. See [ADR 0006](adr/0006-aws-ec2-module.md) for the full decision record.

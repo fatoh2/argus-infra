@@ -628,3 +628,176 @@ This deletes the entire `argus-local` k3d cluster. All resources (pods, volumes,
 | ArgoCD pods stuck in Pending | Insufficient resources | Increase Docker resources (min 4GB RAM, 2 CPUs) |
 | Helm install fails | Helm repo not updated | Script handles this with `helm repo update` |
 | Port conflicts | `:8080` or `:8443` already in use | Stop other services using those ports, or modify the script |
+
+## GCP VM Deployment
+
+### Provision a Single VM on GCP
+
+```bash
+cd terraform/environments/gcp-single-vm
+
+# 1. Configure
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your GCP project ID and SSH public key
+
+# 2. Initialize
+terraform init
+
+# 3. Preview
+terraform plan
+
+# 4. Apply
+terraform apply
+
+# 5. Connect
+ssh argus@$(terraform output -raw instance_public_ip)
+```
+
+### Destroy the VM
+
+```bash
+cd terraform/environments/gcp-single-vm
+terraform destroy
+```
+
+> **Warning:** `terraform destroy` will delete the VM, boot disk, and firewall rules. Data on the boot disk is lost unless a snapshot was taken.
+
+### SSH Access
+
+If you configured `ssh_public_key`, connect with:
+```bash
+ssh argus@<public-ip>
+```
+
+If using `gcloud`:
+```bash
+gcloud compute ssh argus-vm --zone=us-central1-a --project=<project-id>
+```
+
+### Docker Verification
+
+After the VM boots (wait ~2 minutes), verify Docker is running:
+```bash
+ssh argus@<public-ip> "docker --version && docker compose version"
+```
+
+## GCP GKE Deployment
+
+### Provision a GKE Cluster on GCP
+
+```bash
+cd terraform/environments/gcp-gke
+
+# 1. Configure
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your GCP project ID
+
+# 2. Initialize
+terraform init
+
+# 3. Preview
+terraform plan
+
+# 4. Apply
+terraform apply
+
+# 5. Configure kubectl
+$(terraform output -raw kubectl_configure_command)
+
+# 6. Verify
+kubectl get nodes
+
+# 7. (Optional) Use the generated kubeconfig
+export KUBECONFIG=$(terraform output -raw kubeconfig_path)
+```
+
+### Destroy the GKE Cluster
+
+```bash
+cd terraform/environments/gcp-gke
+terraform destroy
+```
+
+> **Warning:** `terraform destroy` will delete the GKE cluster and all associated resources (nodes, disks, load balancers). Persistent volumes and their data will be lost unless backed up.
+
+### Adding Custom Helm Repos
+
+The GKE module accepts a `helm_repos` variable to add additional Helm repositories:
+
+```hcl
+module "argus_gke" {
+  source = "../../modules/gcp-gke"
+
+  project_id = var.project_id
+  region     = var.region
+
+  helm_repos = {
+    "bitnami" = "https://charts.bitnami.com/bitnami"
+    "ingress-nginx" = "https://kubernetes.github.io/ingress-nginx"
+  }
+}
+```
+
+### Switching Between Autopilot and Standard
+
+By default, the cluster uses Autopilot mode (`enable_autopilot = true`). To use Standard mode:
+
+```hcl
+enable_autopilot   = false
+num_nodes          = 3
+node_machine_type  = "e2-standard-4"
+```
+
+> **Note:** Autopilot and Standard are mutually exclusive. You cannot switch a cluster from Autopilot to Standard (or vice versa) after creation — you must destroy and recreate.
+
+
+## AWS EC2 Deployment
+
+### Provision a Single EC2 Instance on AWS
+
+```bash
+cd terraform/environments/aws-single-vm
+
+# 1. Configure
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your SSH public key
+
+# 2. Initialize
+terraform init
+
+# 3. Preview
+terraform plan
+
+# 4. Apply
+terraform apply
+
+# 5. Connect
+ssh argus@$(terraform output -raw instance_public_ip)
+```
+
+### Destroy the EC2 Instance
+
+```bash
+cd terraform/environments/aws-single-vm
+terraform destroy
+```
+
+> **Warning:** `terraform destroy` will delete the EC2 instance, VPC, subnet, security group, and Elastic IP. Data on the root volume is lost unless an AMI or snapshot was created.
+
+### SSH Access
+
+If you configured `ssh_public_key`, connect with:
+```bash
+ssh argus@<public-ip>
+```
+
+### Docker Verification
+
+After the instance boots (wait ~2 minutes), verify Docker is running:
+```bash
+ssh argus@<public-ip> "docker --version && docker compose version"
+```
+
+### Module Reference
+
+See the [architecture documentation](architecture.md#17-aws-ec2-module) for the complete module reference (all variables, outputs, and configuration options). See [ADR 0006](adr/0006-aws-ec2-module.md) for the architecture decision record.
