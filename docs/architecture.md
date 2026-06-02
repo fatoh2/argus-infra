@@ -229,6 +229,8 @@ kubectl get secret -n default example-app-secret
 - Secrets are refreshed every hour (`refreshInterval: 1h`)
 - ESO RBAC is scoped to only manage secrets in namespaces where ExternalSecrets are defined
 
+See [docs/secrets.md](secrets.md) for the full setup guide, verification steps, and troubleshooting.
+
 ## 9. Security (NetworkPolicies, Pod Security, RBAC)
 
 Security is implemented at multiple layers to ensure least-privilege access and defense in depth.
