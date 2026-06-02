@@ -82,6 +82,15 @@ argus-infra/
     └── cluster-sanity.yml  # Cluster-level health checks (scheduled)
 ```
 
+## CI/CD Pipeline
+
+Argus Infra uses a two-tier CI/CD approach:
+
+1. **CI (Continuous Integration)** — runs on every PR to `develop` (Terraform validate + fmt, Ansible syntax + lint)
+2. **CD (Continuous Deployment)** — runs on every merge to `main` (validation + ArgoCD sync)
+
+See [docs/cicd.md](docs/cicd.md) for full pipeline documentation and [docs/runbooks.md](docs/runbooks.md) for operational procedures.
+
 ## Key Features
 
 - **Fully GitOps-driven** — all cluster state defined in Git, ArgoCD syncs automatically
@@ -98,15 +107,6 @@ argus-infra/
 ## Architecture
 
 See [docs/architecture.md](docs/architecture.md) for a detailed breakdown of all components.
-
-## CI/CD Pipeline
-
-Argus Infra uses a two-tier CI/CD approach:
-
-1. **CI (Continuous Integration)** — runs on every PR to `develop` (Terraform validate + fmt, Ansible syntax + lint)
-2. **CD (Continuous Deployment)** — runs on every merge to `main` (validation + ArgoCD sync)
-
-See [docs/cicd.md](docs/cicd.md) for full pipeline documentation and [docs/runbooks.md](docs/runbooks.md) for operational procedures.
 
 ## Prerequisites
 
