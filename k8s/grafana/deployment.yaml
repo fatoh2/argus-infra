@@ -15,11 +15,26 @@ spec:
       labels:
         app: grafana
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 472
+        runAsGroup: 472
+        fsGroup: 472
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: grafana
         image: grafana/grafana:latest
         ports:
         - containerPort: 3000
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          runAsUser: 472
         volumeMounts:
         - name: grafana-persistent
           mountPath: /var/lib/grafana
@@ -27,6 +42,8 @@ spec:
           mountPath: /etc/grafana/provisioning/datasources
         - name: grafana-dashboards
           mountPath: /etc/grafana/provisioning/dashboards
+        - name: tmp
+          mountPath: /tmp
       volumes:
       - name: grafana-persistent
         emptyDir: {}
@@ -36,3 +53,5 @@ spec:
       - name: grafana-dashboards
         configMap:
           name: grafana-dashboards-config
+      - name: tmp
+        emptyDir: {}

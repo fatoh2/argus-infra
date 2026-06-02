@@ -30,6 +30,16 @@ ArgoCD continuously monitors your Git repositories for Kubernetes manifest chang
 2.  **ArgoCD Sync**: ArgoCD will automatically detect the changes and sync them to the cluster. You can monitor the sync status in the ArgoCD UI.
 3.  **Manual Sync/Rollback (ArgoCD UI)**: For immediate deployments or rollbacks, you can trigger these actions directly from the ArgoCD UI.
 
+### NetworkPolicy Deployments
+NetworkPolicies are deployed via ArgoCD as part of the `security` application.
+1.  **Modify Policies**: Edit manifests in `k8s/security/network-policies/`.
+2.  **Commit and Push**: Push changes to the `develop` branch. After review, merge to `main`.
+3.  **ArgoCD Sync**: ArgoCD will automatically sync the new policies to the cluster.
+4.  **Verify**:
+    ```bash
+    kubectl get networkpolicies -A
+    ```
+
 ## 2. Rollback
 Rollbacks depend on the component being rolled back.
 
@@ -59,6 +69,14 @@ ArgoCD allows easy rollbacks to previous application versions.
 1.  **ArgoCD UI**: In the ArgoCD UI, navigate to the application, select "History and Rollback," and choose the desired previous version to roll back to.
 2.  **Git Revert**: Alternatively, revert the Kubernetes manifest changes in your application's Git repository. ArgoCD will detect this and sync the older manifests.
 
+### NetworkPolicy Rollback
+1.  **Revert Git**: Revert the NetworkPolicy manifest changes in `k8s/security/network-policies/`.
+2.  **ArgoCD Sync**: ArgoCD will revert the policies. Note that removing a `default-deny-all` policy will immediately open all pod traffic in that namespace.
+3.  **Emergency Workaround**: If ArgoCD sync is broken, delete policies directly:
+    ```bash
+    kubectl delete networkpolicy -n <namespace> default-deny-all
+    ```
+
 ## 3. Scaling
 Scaling in Argus Infra primarily involves adding or removing virtual machines and configuring k3s to utilize them.
 
@@ -85,7 +103,37 @@ For applications deployed via ArgoCD, scaling is managed within Kubernetes:
 1.  **Modify Kubernetes Manifests**: Update the `replicas` count in your Deployment manifests.
 2.  **Commit and Push**: Push the updated manifests to your application's Git repository. ArgoCD will sync the changes, and Kubernetes will scale your application pods.
 
-## 4. Troubleshooting
+## 4. Running Sanity Checks
+
+The repository includes a local sanity check suite to validate infrastructure code before committing.
+
+### Local Sanity Suite
+Run from the repository root:
+```bash
+# Basic checks (Terraform, Ansible, file structure)
+./scripts/run-sanity-checks.sh
+
+# Verbose output
+./scripts/run-sanity-checks.sh --verbose
+
+# Skip ansible-lint (if not installed)
+./scripts/run-sanity-checks.sh --skip-ansible-lint
+```
+
+### Cluster-Level Checks (requires running cluster)
+```bash
+# Full cluster sanity (nodes, pods, ArgoCD apps, ingress)
+./scripts/cluster-sanity.sh --verbose
+
+# ArgoCD-specific health check
+./scripts/argocd-health.sh --verbose
+```
+
+### CI Pipeline
+- **Sanity Checks** run automatically on every PR to `develop` or `main`, and on push to those branches.
+- **Cluster Sanity** runs every 6 hours via scheduled GitHub Actions workflow (requires `CLUSTER_SANITY_ENABLED` repository variable).
+
+## 5. Troubleshooting
 
 ### General Troubleshooting Steps
 -   **Check Logs**: Review logs of relevant components (VMs, k3s, ArgoCD, application pods).
@@ -104,11 +152,43 @@ For applications deployed via ArgoCD, scaling is managed within Kubernetes:
 
 ### k3s Troubleshooting
 -   **Node Status**: `kubectl get nodes` to check if all nodes are `Ready`.
--   **Pod Status**: `kubectl get pods -A` to check for pending or crashing pods.
--   **k3s Logs**: Check k3s server and agent logs on the VMs: `journalctl -u k3s` or `journalctl -u k3s-agent`.
--   **Network Issues**: Verify CNI (Container Network Interface) is working correctly.
+-   **Pod Status**: `kubectl get pods -A` to check if all pods are running.
+-   **Logs**: `kubectl logs <pod-name> -n <namespace>` to view pod logs.
+-   **Describe**: `kubectl describe pod <pod-name> -n <namespace>` for detailed pod information.
+
+### NetworkPolicy Troubleshooting
+-   **Verify Policies are Applied**:
+    ```bash
+    kubectl get networkpolicies -A
+    ```
+    Each namespace should show a `default-deny-all` policy plus any explicit allow policies.
+
+-   **Test Connectivity**:
+    ```bash
+    # Deploy a temporary test pod
+    kubectl run test-pod --image=busybox -n default --rm -it -- sh
+    
+    # Inside the pod, test connectivity
+    wget -qO- http://some-service.some-namespace:port
+    # If this times out, a NetworkPolicy is blocking it
+    ```
+
+-   **Check Policy Descriptions**:
+    ```bash
+    kubectl describe networkpolicy -n <namespace> <policy-name>
+    ```
+
+-   **CNI Support**: k3s uses Flannel by default, which does **not** enforce NetworkPolicies. If policies appear applied but traffic is not being blocked, install a CNI that supports NetworkPolicy enforcement (e.g., Calico or Cilium).
+
+-   **ArgoCD Sync Issues**: If default-deny blocks ArgoCD from syncing applications across namespaces, you may need to add an allow policy for ArgoCD's service account or temporarily disable the default-deny on the `argocd` namespace.
+
+-   **Pod Labels**: NetworkPolicies use pod selectors (labels). If a policy isn't working as expected, verify that the source/destination pods have the correct labels:
+    ```bash
+    kubectl get pods -n <namespace> --show-labels
+    ```
 
 ### ArgoCD Troubleshooting
--   **ArgoCD Pods**: Check the status of ArgoCD pods in the `argocd` namespace.
--   **Application Sync Status**: In the ArgoCD UI, check the sync status and health of your applications.
--   **Resource Errors**: If an application fails to sync, check the events and logs of the problematic Kubernetes resources.
+-   **Sync Status**: Check the ArgoCD UI or CLI for sync status and errors.
+-   **App Health**: `argocd app list` to see all applications and their health status.
+-   **Logs**: `kubectl logs -n argocd deployment/argocd-application-controller` for controller logs.
+-   **NetworkPolicy Interference**: If ArgoCD apps show `OutOfSync` or `Unknown` after applying default-deny, ArgoCD may be unable to reach resources across namespaces. See NetworkPolicy troubleshooting above.
