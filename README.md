@@ -43,6 +43,8 @@ See the [full setup guide](docs/setup.md) for detailed instructions.
 
 ## Repository Structure
 
+See the [CI/CD Pipeline documentation](docs/cicd.md) for details on how changes are validated and deployed.\n
+
 ```
 argus-infra/
 ├── terraform/              # Hetzner Cloud provisioning
@@ -68,11 +70,13 @@ argus-infra/
 │   ├── argocd-health.sh       # ArgoCD app health check
 │   └── cluster-sanity.sh      # Full cluster-level sanity checks
 ├── docs/                   # Documentation
+│   ├── cicd.md         # CI/CD pipeline overview
 │   ├── architecture.md     # System architecture
 │   ├── setup.md            # Setup guide
 │   └── adr/                # Architecture Decision Records
-└── .github/workflows/      # CI pipeline
-    ├── sanity-checks.yml   # PR-level Terraform + Ansible validation
+└── .github/workflows/
+│   ├── cd-deploy.yml   # CD pipeline (ArgoCD sync)      # CI/CD pipeline
+    ├── sanity-checks.yml   # PR-level Terraform + Ansible validation, CD-level ArgoCD sync
     └── cluster-sanity.yml  # Cluster-level health checks (scheduled)
 ```
 
@@ -85,7 +89,7 @@ argus-infra/
 - **Network Policies** — default-deny on all namespaces with explicit allow rules for least-privilege pod communication
 - **Pod Security Standards** — restricted profile enforced on all namespaces; workloads configured with `runAsNonRoot`, `readOnlyRootFilesystem`, and dropped capabilities
 - **Least-Privilege RBAC** — dedicated ServiceAccounts for each service with minimum required permissions; `api-service` has zero k8s API access
-- **CI-validated** — Terraform validate + fmt, Ansible syntax check + lint, ShellCheck, critical file checks on every PR
+- **CI/CD-validated** — Terraform validate + fmt, Ansible syntax check + lint, ShellCheck, critical file checks on every PR
 - **Cluster health monitoring** — scheduled cluster sanity checks (nodes, pods, ArgoCD apps, ingress) every 6 hours
 - **Local sanity suite** — run `./scripts/run-sanity-checks.sh` before committing to catch issues early
 
