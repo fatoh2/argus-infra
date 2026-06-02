@@ -23,6 +23,23 @@ Argus Infra provides a complete, reproducible Kubernetes cluster running on Hetz
 
 ## Quick Start
 
+### Local Development (k3d)
+
+For local testing without Hetzner Cloud VMs, spin up a k3d cluster:
+
+```bash
+# 0. Install required CLI tools
+bash scripts/install-tools.sh
+
+# 1. Create local cluster with ArgoCD, Prometheus, and Loki
+bash scripts/local-cluster.sh
+
+# 2. Tear down when done
+bash scripts/local-cluster-down.sh
+```
+
+### Production (Hetzner Cloud)
+
 ```bash
 # 0. Install required CLI tools (Terraform, Ansible, kubectl, Helm, ArgoCD, k3d, kubeseal)
 bash scripts/install-tools.sh
@@ -74,6 +91,8 @@ argus-infra/
 │   ├── versions.sh            # Print all tool versions for debugging
 │   ├── run-sanity-checks.sh   # Local sanity suite (Terraform, Ansible, ArgoCD)
 │   ├── argocd-health.sh       # ArgoCD app health check
+│   ├── local-cluster.sh       # Spin up local k3d cluster for testing
+│   ├── local-cluster-down.sh  # Tear down local k3d cluster
 │   └── cluster-sanity.sh      # Full cluster-level sanity checks
 ├── docs/                   # Documentation
 │   ├── cicd.md             # CI/CD pipeline overview
