@@ -5,6 +5,7 @@ Argus Infra uses a three-stage CI/CD pipeline:
 1. **Lint** — runs on every PR and merge to `main`
 2. **Build** — runs on every PR and merge to `main`
 3. **Deploy** — runs on every merge to `main` (triggers ArgoCD sync)
+3. **Deploy** — runs on every merge to `main` (triggers ArgoCD sync)
 
 ## Stage 1: Lint
 ## Stage 2: Build
@@ -22,6 +23,19 @@ Triggered on every PR and merge to `main`. Runs:
 
 **Required to pass** before a PR can be merged to `develop` or before deployment to `main`.
 
+## Stage 2: Build
+
+**File:** `.github/workflows/cd-deploy.yml`
+
+Triggered on every PR and merge to `main`. Runs:
+
+| Step | What it checks |
+|------|----------------|
+| Terraform Plan | `terraform plan` dry-run to catch config errors |
+| Critical Files | Checks for existence of essential project files |
+
+**Required to pass** before a PR can be merged to `develop` or before deployment to `main`.
+
 
 **File:** `.github/workflows/sanity-checks.yml`
 
@@ -31,7 +45,9 @@ Triggered on every PR and merge to `main`. Runs:
 |------|----------------|
 | Terraform Format | `terraform fmt -check -recursive` ensures consistent formatting |
 | ShellCheck | `shellcheck` validates shell script syntax |
+| Terraform Format | `terraform fmt -check -recursive` ensures consistent formatting |
 | Ansible Lint | `ansible-lint` enforces best practices across all playbooks and roles |
+| ShellCheck | `shellcheck` validates shell script syntax |
 
 **Required to pass** before a PR can be merged to `develop`.
 
