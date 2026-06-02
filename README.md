@@ -84,10 +84,10 @@ argus-infra/
 
 ## CI/CD Pipeline
 
-Argus Infra uses a two-tier CI/CD approach:
+Argus Infra uses a three-stage CI/CD pipeline:
 
-1. **CI (Continuous Integration)** — runs on every PR to `develop` (Terraform validate + fmt, Ansible syntax + lint)
-2. **CD (Continuous Deployment)** — runs on every merge to `main` (validation + ArgoCD sync)
+1. **CI (Continuous Integration)** — runs on every PR to `develop` (Terraform validate + fmt, plan, Ansible syntax + lint, ShellCheck, critical files check)
+2. **CD (Continuous Deployment)** — runs on every merge to `main` (lint → build → ArgoCD sync)
 
 See [docs/cicd.md](docs/cicd.md) for full pipeline documentation and [docs/runbooks.md](docs/runbooks.md) for operational procedures.
 
