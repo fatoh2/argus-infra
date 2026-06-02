@@ -228,6 +228,44 @@ kubectl apply -f k8s/argocd/app-of-apps.yaml
 
 ArgoCD will automatically detect the new application and sync it, deploying all child applications defined in `k8s/argocd/apps/`.
 
+
+### 4.3 Deploy Pod Security Standards
+
+After the cluster applications are deployed, enforce Pod Security Standards (restricted profile) on all application namespaces:
+
+```bash
+# Apply namespace labels for restricted profile
+kubectl apply -f k8s/security/pod-security/
+
+# Verify enforcement
+kubectl describe ns monitoring
+# Should show: pod-security.kubernetes.io/enforce: restricted
+```
+
+This labels the following namespaces with `pod-security.kubernetes.io/enforce: restricted`:
+- `monitoring` — Prometheus, Grafana, Loki, Promtail
+- `databases` — PostgreSQL, Redis
+- `ingress` — Traefik, cert-manager, wildcard TLS
+- `traefik` — Traefik ingress controller
+- `cert-manager` — cert-manager operator
+- `default` — General application workloads
+
+> **Note:** The `kube-system` and `argocd` namespaces are intentionally excluded from the restricted profile, as system-level components may require elevated privileges.
+
+### 4.4 Verify Workload Compliance
+
+After applying the restricted profile, verify that all existing workloads comply:
+
+```bash
+# Check all pods are running
+kubectl get pods -A
+
+# Check for any admission controller rejections
+kubectl describe pod -n monitoring | grep -i "violates PodSecurity"
+```
+
+If any pods fail to start due to Pod Security violations, refer to the [runbooks](runbooks.md#pod-security-standards-troubleshooting) for remediation steps.
+
 ## 5. Running Sanity Checks
 
 The repository includes a local sanity check suite to validate changes before committing. Run it from the repository root:
