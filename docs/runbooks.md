@@ -40,6 +40,31 @@ NetworkPolicies are deployed via ArgoCD as part of the `security` application.
     kubectl get networkpolicies -A
     ```
 
+
+### Pod Security Standards Deployment
+Pod Security Standards are enforced via namespace labels in `k8s/security/pod-security/`.
+1.  **Apply Namespace Labels**:
+    ```bash
+    kubectl apply -f k8s/security/pod-security/
+    ```
+2.  **Verify Enforcement**:
+    ```bash
+    kubectl describe ns monitoring
+    # Look for: pod-security.kubernetes.io/enforce: restricted
+    ```
+3.  **Verify Workload Compliance**: After labeling, check that all pods in restricted namespaces are running:
+    ```bash
+    kubectl get pods -n monitoring
+    kubectl get pods -n databases
+    ```
+    Any pod that violates the restricted profile will be rejected by the admission controller.
+
+### Workload SecurityContext Updates
+When adding a new workload to a restricted namespace, ensure its `securityContext` complies:
+- Pod-level: `runAsNonRoot: true`, `seccompProfile.type: RuntimeDefault`
+- Container-level: `allowPrivilegeEscalation: false`, `readOnlyRootFilesystem: true`, `capabilities.drop: [ALL]`
+- Add `emptyDir` volumes for any writable paths (e.g., `/tmp`)
+
 ## 2. Rollback
 Rollbacks depend on the component being rolled back.
 
@@ -76,6 +101,16 @@ ArgoCD allows easy rollbacks to previous application versions.
     ```bash
     kubectl delete networkpolicy -n <namespace> default-deny-all
     ```
+
+
+### Pod Security Standards Rollback
+1.  **Revert Git**: Revert the namespace label changes in `k8s/security/pod-security/`.
+2.  **ArgoCD Sync**: ArgoCD will revert the namespace labels, removing the restricted profile enforcement.
+3.  **Emergency Workaround**: If ArgoCD sync is broken, remove labels directly:
+    ```bash
+    kubectl label ns monitoring pod-security.kubernetes.io/enforce- pod-security.kubernetes.io/audit- pod-security.kubernetes.io/warn-
+    ```
+4.  **Revert Workload Changes**: If a workload's `securityContext` changes caused issues, revert those changes in Git and sync via ArgoCD.
 
 ## 3. Scaling
 Scaling in Argus Infra primarily involves adding or removing virtual machines and configuring k3s to utilize them.
@@ -186,6 +221,45 @@ Run from the repository root:
     ```bash
     kubectl get pods -n <namespace> --show-labels
     ```
+
+
+### Pod Security Standards Troubleshooting
+-   **Pods Failing to Start After Labeling**: If pods in a namespace are stuck in `Pending` or `ContainerCreating` after applying the restricted profile, check the admission controller events:
+    ```bash
+    kubectl describe pod <pod-name> -n <namespace>
+    # Look for: "violates PodSecurity" in the Events section
+    ```
+    Common violations and fixes:
+    | Violation | Fix |
+    |-----------|-----|
+    | `runAsNonRoot` is required | Add `securityContext.runAsNonRoot: true` to pod spec |
+    | `readOnlyRootFilesystem` is required | Add `securityContext.readOnlyRootFilesystem: true` and mount `emptyDir` for writable paths |
+    | `capabilities.drop` is required | Add `securityContext.capabilities.drop: [ALL]` |
+    | `seccompProfile` is required | Add `securityContext.seccompProfile.type: RuntimeDefault` |
+
+-   **Grafana Fails to Start**: If Grafana cannot write to its filesystem, ensure the `emptyDir` volume for `/tmp` is present in the deployment:
+    ```bash
+    kubectl get deployment grafana -n monitoring -o yaml | grep -A5 emptyDir
+    ```
+
+-   **Postgres Backup CronJob Fails**: The `amazon/aws-cli:latest` image may run as root. If the CronJob fails after applying the restricted profile:
+    ```bash
+    kubectl logs job/postgres-backup-<id> -n databases
+    ```
+    If the error is permission-related, switch to a non-root AWS CLI image or remove `runAsNonRoot: true` from the CronJob's securityContext.
+
+-   **Temporarily Disable Enforcement**: To debug a namespace without the restricted profile blocking pods:
+    ```bash
+    kubectl label ns <namespace> pod-security.kubernetes.io/enforce- --overwrite
+    # Re-enable after debugging:
+    kubectl label ns <namespace> pod-security.kubernetes.io/enforce=restricted --overwrite
+    ```
+
+-   **Check Policy Version**: Verify the enforce-version is compatible with your cluster:
+    ```bash
+    kubectl describe ns monitoring | grep enforce-version
+    ```
+    If using an older Kubernetes version (< 1.25), change `latest` to a specific version like `v1.24`.
 
 ### ArgoCD Troubleshooting
 -   **Sync Status**: Check the ArgoCD UI or CLI for sync status and errors.

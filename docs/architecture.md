@@ -161,6 +161,85 @@ NetworkPolicies are deployed via ArgoCD as part of the `security` application, w
 - Policies are label-based and will only take effect when pods with matching labels are deployed. Pre-created policies for future services (e.g., `solana-adapter`, `api-service`) are harmless until those pods exist.
 - NetworkPolicies require a CNI plugin that supports them (k3s uses Flannel by default, which does not enforce NetworkPolicies). For enforcement, install a CNI like Calico or Cilium.
 
+
+## 9.5 Pod Security Standards
+
+Argus Infra enforces Kubernetes [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/) at the **restricted** level across all application namespaces. This is the strictest built-in policy level and provides defense-in-depth alongside NetworkPolicies.
+
+### Namespace Labeling
+
+Each application namespace is labeled with Pod Security admission controller labels:
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+```
+
+The following namespaces are labeled (manifests in `k8s/security/pod-security/`):
+
+| Namespace | Purpose |
+|-----------|---------|
+| `monitoring` | Prometheus, Grafana, Loki, Promtail |
+| `databases` | PostgreSQL, Redis |
+| `ingress` | Traefik, cert-manager, wildcard TLS |
+| `traefik` | Traefik ingress controller |
+| `cert-manager` | cert-manager operator |
+| `default` | General application workloads |
+
+### Workload Compliance
+
+All workloads deployed to restricted namespaces must comply with the restricted profile. Key requirements enforced by the admission controller:
+
+| Requirement | Example Configuration |
+|-------------|----------------------|
+| **Run as non-root** | `securityContext.runAsNonRoot: true` |
+| **No privilege escalation** | `securityContext.allowPrivilegeEscalation: false` |
+| **Drop all capabilities** | `securityContext.capabilities.drop: [ALL]` |
+| **Read-only root filesystem** | `securityContext.readOnlyRootFilesystem: true` |
+| **Seccomp profile** | `securityContext.seccompProfile.type: RuntimeDefault` |
+
+### Updated Workloads
+
+The following workloads have been updated to comply with the restricted profile:
+
+- **Grafana Deployment** (`k8s/grafana/deployment.yaml`):
+  - Pod-level: `runAsNonRoot: true`, `runAsUser: 472`, `runAsGroup: 472`, `fsGroup: 472`, `seccompProfile: RuntimeDefault`
+  - Container-level: `allowPrivilegeEscalation: false`, `readOnlyRootFilesystem: true`, `capabilities.drop: [ALL]`
+  - Added `emptyDir` volume mounted at `/tmp` for Grafana temp files
+
+- **Postgres Backup CronJob** (`k8s/postgres-backup-cronjob.yaml`):
+  - Pod-level: `runAsNonRoot: true`, `seccompProfile: RuntimeDefault`
+  - Container-level: `allowPrivilegeEscalation: false`, `readOnlyRootFilesystem: true`, `capabilities.drop: [ALL]`
+  - Added `emptyDir` volume mounted at `/tmp`
+
+### Applying the Policies
+
+```bash
+# Apply namespace labels
+kubectl apply -f k8s/security/pod-security/
+
+# Verify enforcement
+kubectl describe ns monitoring
+# Should show: pod-security.kubernetes.io/enforce: restricted
+```
+
+### Risks & Considerations
+
+- The `amazon/aws-cli:latest` image used in the Postgres Backup CronJob may run as root by default. If the CronJob fails after applying the restricted profile, switch to a non-root AWS CLI image or adjust the securityContext.
+- `readOnlyRootFilesystem: true` requires all writable paths to be explicitly mounted as `emptyDir` volumes. Any workload that writes to its container filesystem without an `emptyDir` mount will fail.
+- Grafana's default image runs as user 472, which satisfies `runAsNonRoot: true`. If using a custom Grafana image, verify the user ID.
+- The `kube-system` and `argocd` namespaces are intentionally not labeled with the restricted profile, as system-level components may require elevated privileges.
+
+
 ## 10. CI/CD Pipeline & Testing
 
 Argus Infra uses GitHub Actions for continuous integration and cluster health monitoring. The pipeline is designed to catch issues early and ensure cluster reliability.
