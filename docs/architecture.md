@@ -118,12 +118,41 @@ A comprehensive observability stack provides metrics collection, visualization, 
   - **Prometheus Server:** Scrapes metrics from configured targets.
   - **Alertmanager:** Handles alerts based on Prometheus rules.
   - **ServiceMonitors/PodMonitors:** CRDs that define which services/pods to scrape.
-- **Grafana:** Provides dashboards for visualizing Prometheus metrics and Loki logs. Pre-configured with:
-  - Kubernetes cluster monitoring dashboards.
-  - Custom dashboards for application-specific metrics.
+- **Grafana:** Deployed via ArgoCD from `k8s/grafana/` as a standalone deployment (not part of kube-prometheus-stack). Provides dashboards for visualizing Prometheus metrics and Loki logs. Pre-configured with:
+  - Kubernetes cluster monitoring dashboards (CPU, memory, network).
+  - Prometheus datasource auto-configured via ConfigMap.
   - Loki as a data source for log exploration.
+  - Ingress at `grafana.argus.local` with Traefik and automatic TLS via cert-manager.
 - **Loki:** A horizontally-scalable, highly-available log aggregation system. It indexes metadata (labels) rather than full-text, making it cost-effective.
 - **Promtail:** A log collector that runs on each node, shipping container logs to Loki.
+
+
+
+### Grafana Deployment Details
+
+Grafana is deployed as a standalone ArgoCD application (separate from the `monitoring` app that manages kube-prometheus-stack). The deployment consists of:
+
+| Resource | File | Purpose |
+|----------|------|---------|
+| ArgoCD Application | `k8s/argocd/apps/grafana.yaml` | Declares the Grafana app for ArgoCD GitOps |
+| Deployment | `k8s/grafana/deployment.yaml` | Single replica running `grafana/grafana:latest` on port 3000 |
+| Service | `k8s/grafana/service.yaml` | ClusterIP service exposing port 80 → 3000 |
+| Ingress | `k8s/grafana/ingress.yaml` | Traefik ingress at `grafana.argus.local` with TLS via cert-manager |
+| Datasource ConfigMap | `k8s/grafana/configmap-datasources.yaml` | Pre-configures Prometheus datasource |
+| Dashboard ConfigMap | `k8s/grafana/configmap-dashboards.yaml` | Provisioned dashboards (Node Exporter Full, Kubernetes Cluster Overview) |
+
+**Datasource:** Grafana is pre-configured with a Prometheus datasource pointing to the kube-prometheus-stack Prometheus service at `http://prometheus-kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090`.
+
+**Dashboards:** Two dashboards are provisioned via ConfigMap:
+- **Node Exporter Full** (`uid: node-exporter-full`) — Node-level CPU usage, memory usage, and resource utilization across all worker nodes.
+- **Kubernetes Cluster Overview** (`uid: kubernetes-cluster-overview`) — CPU usage by pod, memory usage by pod, and cluster-level resource health.
+
+Additional dashboards can be added by extending the `configmap-dashboards.yaml` ConfigMap.
+
+**Ingress:** Grafana is accessible at `https://grafana.argus.local` via Traefik ingress with automatic TLS from cert-manager (Let's Encrypt). Default credentials are `admin`/`admin` (change on first login).
+
+**Storage:** Grafana uses an `emptyDir` volume for `/var/lib/grafana`. This means dashboards and settings are lost on pod restart if not provisioned via ConfigMaps. For persistent storage, replace with a PVC backed by Longhorn or similar.
+
 
 ## 9. Security (Kubernetes NetworkPolicies)
 
