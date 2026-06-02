@@ -1,8 +1,8 @@
 # Argus Infra 🚀
 
 [![Sanity Checks](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml)
-[![CD Deploy](https://github.com/fatoh2/argus-infra/actions/workflows/cd-deploy.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cd-deploy.yml)
 [![Cluster Sanity](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml)
+[![CD Deploy](https://github.com/fatoh2/argus-infra/actions/workflows/cd-deploy.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cd-deploy.yml)
 
 **A production-grade Kubernetes homelab platform on Hetzner Cloud** — provisioned with Terraform, configured with Ansible, and managed via GitOps with ArgoCD.
 
@@ -73,12 +73,12 @@ argus-infra/
 ├── docs/                   # Documentation
 │   ├── cicd.md             # CI/CD pipeline overview
 │   ├── architecture.md     # System architecture
-│   ├── setup.md            # Setup guide
 │   ├── runbooks.md         # Operational runbooks
+│   ├── setup.md            # Setup guide
 │   └── adr/                # Architecture Decision Records
-└── .github/workflows/
-    ├── cd-deploy.yml       # CD pipeline (ArgoCD sync)
+└── .github/workflows/      # CI/CD pipeline
     ├── sanity-checks.yml   # PR-level Terraform + Ansible validation, CD-level ArgoCD sync
+    ├── cd-deploy.yml       # CD pipeline (ArgoCD sync)
     └── cluster-sanity.yml  # Cluster-level health checks (scheduled)
 ```
 
@@ -86,26 +86,10 @@ argus-infra/
 
 Argus Infra uses a two-tier CI/CD approach:
 
-1. **CI (Continuous Integration)** — runs on every PR to `develop` via `.github/workflows/sanity-checks.yml`
-2. **CD (Continuous Deployment)** — runs on every merge to `main` via `.github/workflows/cd-deploy.yml`
+1. **CI (Continuous Integration)** — runs on every PR to `develop` (Terraform validate + fmt, Ansible syntax + lint)
+2. **CD (Continuous Deployment)** — runs on every merge to `main` (validation + ArgoCD sync)
 
-### CI: Pull Request Validation
-
-Every PR opened against `develop` runs:
-- **Terraform Validate** — `terraform validate` and `terraform fmt -check`
-- **Terraform Plan** — dry-run plan targeting the network module
-- **Ansible Syntax** — `ansible-playbook --syntax-check`
-- **Ansible Lint** — `ansible-lint` across all playbooks and roles
-
-These checks must pass before a PR can be merged.
-
-### CD: Continuous Deployment
-
-Every merge to `main` triggers:
-- **Validate** — same sanity checks as CI (belt-and-suspenders)
-- **ArgoCD Sync** — ArgoCD detects the change and syncs the cluster state
-
-ArgoCD watches the `main` branch and automatically reconciles the cluster to match the manifests in Git. See [docs/cicd.md](docs/cicd.md) for full details, including webhook setup and troubleshooting.
+See [docs/cicd.md](docs/cicd.md) for full pipeline documentation and [docs/runbooks.md](docs/runbooks.md) for operational procedures.
 
 ## Key Features
 
