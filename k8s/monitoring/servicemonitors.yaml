@@ -1,0 +1,59 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: argus-monitor-api-service
+  namespace: monitoring # ServiceMonitor itself lives in the monitoring namespace
+  labels:
+    app.kubernetes.io/name: argus-monitor
+    app.kubernetes.io/component: api-service
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argus-monitor
+      app.kubernetes.io/component: api-service
+  endpoints:
+  - port: http # Assuming the service exposes an http port
+    interval: 30s
+  namespaceSelector:
+    matchNames:
+    - argus-monitor # Target services in the argus-monitor namespace
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: argus-monitor-chain-indexer
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: argus-monitor
+    app.kubernetes.io/component: chain-indexer
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argus-monitor
+      app.kubernetes.io/component: chain-indexer
+  endpoints:
+  - port: http
+    interval: 30s
+  namespaceSelector:
+    matchNames:
+    - argus-monitor
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: argus-monitor-solana-adapter
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: argus-monitor
+    app.kubernetes.io/component: solana-adapter
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argus-monitor
+      app.kubernetes.io/component: solana-adapter
+  endpoints:
+  - port: http
+    interval: 30s
+  namespaceSelector:
+    matchNames:
+    - argus-monitor
