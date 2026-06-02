@@ -75,6 +75,7 @@ The ArgoCD app-of-apps structure is defined in `k8s/argocd/apps/`:
 | `traefik` | Helm chart (traefik/traefik) | `traefik` | Ingress controller |
 | `cert-manager` | Helm chart (cert-manager/cert-manager) | `cert-manager` | TLS certificate management |
 | `cluster-issuer` | `k8s/cluster-issuer/` | `cert-manager` | Let's Encrypt ClusterIssuer |
+| `external-secrets` | `k8s/external-secrets/` | `external-secrets-operator` | External Secrets Operator + Doppler |
 | `databases` | `k8s/databases/` | `databases` | PostgreSQL, Redis |
 | `security` | `k8s/security/` | (cluster-wide) | NetworkPolicies, Pod Security, RBAC |
 
@@ -125,6 +126,8 @@ Secrets are managed securely using External Secrets Operator (ESO) with Doppler 
 - **Backend:** Doppler serves as the central secrets management platform.
 - **Projects:** Each application (e.g., `argus-monitor`, `argus-ai`) has its own Doppler project.
 - **Integration:** ESO authenticates with Doppler using a service token stored in a Kubernetes Secret.
+
+See [docs/secrets.md](secrets.md) for the full setup guide, verification steps, and troubleshooting.
 
 ## 9. Security (NetworkPolicies, Pod Security, RBAC)
 
