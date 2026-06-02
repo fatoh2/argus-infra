@@ -293,3 +293,73 @@ bash scripts/run-sanity-checks.sh
 - Check the [CI/CD Pipeline](docs/cicd.md) for how changes are validated and deployed
 - See the [Runbooks](docs/runbooks.md) for operational procedures
 - Browse [Architecture Decision Records](docs/adr/) for design rationale
+
+
+## 6. Alternative: GCP Compute Engine (Single VM)
+
+For lightweight deployments, testing, or running Argus components that don't require a full Kubernetes cluster, you can deploy a single VM on Google Cloud Platform instead of provisioning a Hetzner k3s cluster.
+
+### Prerequisites
+
+- **Google Cloud Platform account** — with billing enabled
+- **GCP project** — create one at [console.cloud.google.com](https://console.cloud.google.com)
+- **SSH key pair** — for accessing the VM
+- **CLI tools** — `make install-tools` installs Terraform (the GCP provider is downloaded automatically)
+
+### Provision the VM
+
+```bash
+cd terraform/environments/gcp-single-vm
+
+# Copy and edit the example vars
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Edit `terraform.tfvars` with your GCP project ID and SSH public key:
+
+```hcl
+project_id      = "my-gcp-project"       # Required: your GCP project ID
+ssh_public_key  = "ssh-rsa AAA..."        # Required: your public SSH key
+region          = "us-central1"           # Optional: GCP region
+machine_type    = "e2-standard-4"         # Optional: VM size
+boot_disk_size  = 100                     # Optional: disk size in GB
+```
+
+Initialize and apply:
+
+```bash
+terraform init
+terraform plan
+terraform apply
+```
+
+### Connect to the VM
+
+```bash
+# Using the SSH key configured in terraform.tfvars
+ssh argus@$(terraform output -raw public_ip)
+
+# Or using gcloud (if you have the Google Cloud SDK installed)
+gcloud compute ssh argus-vm --zone=us-central1-a --project=<project-id>
+```
+
+### Verify Docker
+
+After the VM boots (wait ~2 minutes), verify Docker and Docker Compose are installed:
+
+```bash
+ssh argus@$(terraform output -raw public_ip) "docker --version && docker compose version"
+```
+
+### Destroy the VM
+
+```bash
+cd terraform/environments/gcp-single-vm
+terraform destroy
+```
+
+> **Warning:** `terraform destroy` will delete the VM, boot disk, and firewall rules. Data on the boot disk is lost unless a snapshot was taken.
+
+### Full Reference
+
+See the [architecture documentation](architecture.md#9-gcp-compute-engine-module) for the complete module reference (all variables, outputs, and configuration options). See the [runbooks](runbooks.md#gcp-vm-deployment) for operational procedures.

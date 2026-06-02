@@ -4,15 +4,15 @@
 [![Cluster Sanity](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml)
 [![CD Deploy](https://github.com/fatoh2/argus-infra/actions/workflows/cd-deploy.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cd-deploy.yml)
 
-**A production-grade Kubernetes homelab platform on Hetzner Cloud** — provisioned with Terraform, configured with Ansible, and managed via GitOps with ArgoCD.
+**A production-grade Kubernetes homelab platform** — provisioned with Terraform (Hetzner Cloud / GCP), configured with Ansible, and managed via GitOps with ArgoCD.
 
 ## Overview
 
-Argus Infra provides a complete, reproducible Kubernetes cluster running on Hetzner Cloud VMs. Everything is defined as code:
+Argus Infra provides a complete, reproducible Kubernetes cluster running on Hetzner Cloud VMs (or a single VM on GCP). Everything is defined as code:
 
 | Layer | Tool | Purpose |
 |-------|------|---------|
-| **Infrastructure** | Terraform | Provision Hetzner VMs, networks, SSH keys |
+| **Infrastructure** | Terraform | Provision Hetzner VMs / GCP Compute Engine VMs, networks, SSH keys |
 | **Configuration** | Ansible | Install k3s, configure nodes, firewall rules |
 | **GitOps** | ArgoCD | Declarative app deployment, self-healing |
 | **Ingress** | Traefik + cert-manager | HTTP routing, automatic TLS via Let's Encrypt |
@@ -62,6 +62,29 @@ kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manif
 
 See the [full setup guide](docs/setup.md) for detailed instructions.
 
+### Single VM (GCP Compute Engine)
+
+For lightweight deployments or testing on Google Cloud Platform:
+
+```bash
+# 0. Install required CLI tools
+make install-tools
+
+# 1. Provision a single VM with Docker
+cd terraform/environments/gcp-single-vm
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your GCP project ID and SSH public key
+terraform init && terraform apply
+
+# 2. Connect via SSH
+ssh argus@$(terraform output -raw public_ip)
+
+# 3. Verify Docker is running
+ssh argus@$(terraform output -raw public_ip) "docker --version && docker compose version"
+```
+
+See the [GCP module documentation](docs/architecture.md#9-gcp-compute-engine-module) for full details.
+
 ## Makefile Targets
 
 The project includes a `Makefile` with common infra operations. Run `make` or `make help` to see all targets:
@@ -84,8 +107,10 @@ See the [CI/CD Pipeline documentation](docs/cicd.md) for details on how changes 
 ```
 argus-infra/
 ├── Makefile                 # Common infra operations (lint, validate, plan, etc.)
-├── terraform/               # Hetzner Cloud provisioning
-│   └── environments/homelab/
+├── terraform/               # Infrastructure provisioning
+│   ├── environments/homelab/       # Hetzner Cloud (k3s cluster)
+│   ├── environments/gcp-single-vm/ # GCP Compute Engine (single VM)
+│   └── modules/gcp-compute-engine/ # GCP VM Terraform module
 ├── ansible/                 # k3s cluster configuration
 │   ├── inventory/
 │   ├── playbooks/
@@ -115,7 +140,8 @@ argus-infra/
 │   ├── architecture.md      # System architecture
 │   ├── runbooks.md          # Operational runbooks
 │   ├── setup.md             # Setup guide
-│   └── adr/                 # Architecture Decision Records
+│   ├── adr/                 # Architecture Decision Records
+│   └── secrets.md             # Secrets management
 └── .github/workflows/       # CI/CD pipeline
     ├── sanity-checks.yml    # PR-level Terraform + Ansible validation (CI)
     ├── cd-deploy.yml        # CD pipeline (lint → build → deploy, path-filtered)
@@ -139,6 +165,7 @@ See [docs/cicd.md](docs/cicd.md) for full pipeline documentation and [docs/runbo
 - **Observability out of the box** — Prometheus metrics, Grafana dashboards (Node Exporter Full, Kubernetes Cluster Overview), Loki logs
 - **Secure by default** — External Secrets Operator + Doppler for secret injection, NetworkPolicies for least-privilege access, Pod Security Standards (restricted profile)
 - **Makefile-driven workflow** — `make lint`, `make validate`, `make plan`, `make install-tools`, `make local-up/down`, `make check-versions`, `make sanity`
-- **Local development** — k3d cluster for testing without Hetzner Cloud costs
+- **Local development** — k3d cluster for testing without cloud costs
+- **Multi-cloud support** — Hetzner Cloud (k3s cluster) and GCP (single VM) deployment options
 - **Automated CI/CD** — GitHub Actions validate every PR and deploy on merge to `main`
 - **Architecture Decision Records** — all significant decisions documented in `docs/adr/`
