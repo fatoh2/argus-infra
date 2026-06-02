@@ -271,33 +271,91 @@ See [docs/runbooks.md](runbooks.md) for detailed restore procedures, including:
 
 Argus Infra includes a Terraform module for deploying a single VM on Google Cloud Platform (GCP). This is useful for lightweight deployments, testing, or running Argus components that don't require a full Kubernetes cluster.
 
-### Module: `modules/gcp-compute-engine/`
+### Module: `modules/gcp-compute-engine`
 
-**Purpose:** Provision a single Compute Engine VM with Docker pre-installed, firewall rules for SSH/HTTP/HTTPS, and optional public IP.
+The GCP Compute Engine module provisions:
 
-**Key Variables:**
-- `project_id` (required) — GCP project ID
-- `name` — VM name (default: `argus-vm`)
-- `region` / `zone` — Deployment location
-- `machine_type` — GCP machine type (default: `e2-standard-4`)
-- `boot_disk_size` — Boot disk size in GB (default: 100)
-- `enable_public_ip` — Whether to assign an ephemeral external IP
-- `ssh_public_key` — Public SSH key for VM access
-- `create_firewall_rules` — Whether to create SSH/HTTP/HTTPS firewall rules
+- **Compute Engine VM** — Ubuntu 22.04 LTS with configurable machine type and disk size
+- **Firewall Rules** — SSH (22), HTTP (80), and HTTPS (443) with configurable source CIDR ranges
+- **External IP** — Optional ephemeral public IP address
+- **Startup Script** — Installs Docker and Docker Compose on first boot
 
-**Outputs:** Instance ID, name, self-link, internal/external IPs, SSH command, firewall rule names.
+### Usage
 
-**Usage:**
 ```hcl
 module "argus_vm" {
   source = "../../modules/gcp-compute-engine"
 
-  project_id     = var.project_id
-  name           = "argus-vm"
-  region         = var.region
-  machine_type   = "e2-standard-4"
+  project_id      = "my-gcp-project"
+  name            = "argus-vm"
+  region          = "us-central1"
+  machine_type    = "e2-standard-4"
+  boot_disk_size  = 100
+  enable_public_ip = true
+
   ssh_public_key = var.ssh_public_key
+  ssh_user       = "argus"
+
+  tags = ["argus", "argus-vm", "http-server", "https-server"]
+
+  labels = {
+    project = "argus"
+    env     = "production"
+  }
+
+  create_firewall_rules = true
 }
+```
+
+### Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `project_id` | (required) | GCP project ID |
+| `name` | `argus-vm` | VM instance name |
+| `region` | `us-central1` | GCP region |
+| `zone` | `null` (auto) | GCP zone |
+| `machine_type` | `e2-standard-4` | Machine type |
+| `boot_disk_size` | `100` | Boot disk size (GB) |
+| `boot_disk_type` | `pd-standard` | Disk type |
+| `boot_disk_image` | `ubuntu-os-cloud/ubuntu-2204-lts` | OS image |
+| `enable_public_ip` | `true` | Assign external IP |
+| `ssh_public_key` | `null` | SSH public key content |
+| `ssh_user` | `argus` | SSH username |
+| `create_firewall_rules` | `true` | Create SSH/HTTP/HTTPS rules |
+| `allowed_ssh_cidrs` | `["0.0.0.0/0"]` | SSH source CIDRs |
+| `allowed_http_cidrs` | `["0.0.0.0/0"]` | HTTP source CIDRs |
+| `allowed_https_cidrs` | `["0.0.0.0/0"]` | HTTPS source CIDRs |
+
+### Outputs
+
+| Output | Description |
+|---|---|
+| `instance_id` | Instance ID |
+| `instance_name` | Instance name |
+| `network_ip` | Private IP address |
+| `nat_ip` | Public IP address (if enabled) |
+| `ssh_command` | Ready-to-use SSH command |
+| `firewall_rule_names` | Created firewall rule names |
+
+### Quick Start
+
+```bash
+cd terraform/environments/gcp-single-vm
+
+# Copy and edit the example vars
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your GCP project ID and SSH key
+
+# Initialize and plan
+terraform init
+terraform plan
+
+# Apply
+terraform apply
+
+# Connect
+ssh argus@$(terraform output -raw public_ip)
 ```
 
 ## 16. GCP GKE Module
