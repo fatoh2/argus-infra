@@ -1,0 +1,161 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: databases
+  labels:
+    app.kubernetes.io/name: postgres-backup
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: argus-infra
+spec:
+  schedule: "0 2 * * *" # Daily at 2 AM UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: postgres-backup
+          restartPolicy: OnFailure
+          containers:
+          - name: backup
+            image: postgres:16-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -euo pipefail
+
+              # Timestamp for the backup file
+              TIMESTAMP=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
+              BACKUP_FILE="postgres-argus-db-${TIMESTAMP}.sql.gz"
+              LATEST_LINK="postgres-argus-db-latest.sql.gz"
+
+              echo "Starting PostgreSQL backup at ${TIMESTAMP}"
+
+              # Dump the database, compress, and upload to S3-compatible storage
+              pg_dump \
+                --host="${PGHOST}" \
+                --port="${PGPORT}" \
+                --username="${PGUSER}" \
+                --dbname="${PGDATABASE}" \
+                --no-password \
+                --format=custom \
+                --compress=9 \
+                --file=/tmp/backup.dump
+
+              echo "Backup dump created, uploading to S3..."
+
+              # Upload to S3-compatible storage (MinIO / Backblaze B2 / AWS S3)
+              aws s3 cp /tmp/backup.dump "s3://${AWS_BUCKET}/${BACKUP_FILE}" \
+                --endpoint-url="${AWS_ENDPOINT_URL}"
+
+              # Also upload as "latest" for easy restore reference
+              aws s3 cp /tmp/backup.dump "s3://${AWS_BUCKET}/${LATEST_LINK}" \
+                --endpoint-url="${AWS_ENDPOINT_URL}"
+
+              echo "Backup uploaded successfully: s3://${AWS_BUCKET}/${BACKUP_FILE}"
+
+              # Clean up old backups (keep last 30 days)
+              echo "Cleaning up backups older than 30 days..."
+              aws s3 ls "s3://${AWS_BUCKET}/" --endpoint-url="${AWS_ENDPOINT_URL}" \
+                | grep 'postgres-argus-db-' \
+                | while read -r line; do
+                  DATE_PART=$(echo "$line" | awk '{print $1" "$2}')
+                  FILE_NAME=$(echo "$line" | awk '{print $4}')
+                  FILE_TIMESTAMP=$(date -d "$DATE_PART" +%s 2>/dev/null || echo "0")
+                  CUTOFF=$(date -d "-30 days" +%s)
+                  if [ "$FILE_TIMESTAMP" -ne "0" ] && [ "$FILE_TIMESTAMP" -lt "$CUTOFF" ]; then
+                    aws s3 rm "s3://${AWS_BUCKET}/${FILE_NAME}" --endpoint-url="${AWS_ENDPOINT_URL}"
+                    echo "Deleted old backup: ${FILE_NAME}"
+                  fi
+                done
+
+              echo "Backup job completed successfully"
+            env:
+            - name: PGHOST
+              value: "postgresql.databases.svc.cluster.local"
+            - name: PGPORT
+              value: "5432"
+            - name: PGUSER
+              value: "backup_user"
+            - name: PGDATABASE
+              value: "argus_db"
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-backup-credentials
+                  key: password
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-s3-credentials
+                  key: access_key_id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-s3-credentials
+                  key: secret_access_key
+            - name: AWS_ENDPOINT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: aws-s3-credentials
+                  key: endpoint_url
+            - name: AWS_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: aws-s3-credentials
+                  key: bucket
+            - name: AWS_REGION
+              value: "eu-central-1"
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "256Mi"
+              limits:
+                cpu: "500m"
+                memory: "512Mi"
+          volumes: []
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres-backup
+  namespace: databases
+  labels:
+    app.kubernetes.io/name: postgres-backup
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: argus-infra
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: postgres-backup
+  namespace: databases
+  labels:
+    app.kubernetes.io/name: postgres-backup
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: argus-infra
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: postgres-backup
+  namespace: databases
+  labels:
+    app.kubernetes.io/name: postgres-backup
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: argus-infra
+subjects:
+- kind: ServiceAccount
+  name: postgres-backup
+  namespace: databases
+roleRef:
+  kind: Role
+  name: postgres-backup
+  apiGroup: rbac.authorization.k8s.io
