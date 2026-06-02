@@ -16,7 +16,8 @@ configured with Ansible, and operated via ArgoCD GitOps.
 - **Database**: PostgreSQL + pgbackrest → Backblaze B2
 - **Queue**: Redis
 - **Package manager**: Helm
-- **CI/CD**: GitHub Actions (sanity-checks.yml, cluster-sanity.yml)
+- **CI/CD**: GitHub Actions (sanity-checks.yml, cd-deploy.yml, cluster-sanity.yml)
+  cd-deploy.yml          CD pipeline (ArgoCD sync on merge to main)
 
 ## Repo Structure
 ```
@@ -39,6 +40,7 @@ scripts/
   cluster-sanity.sh      Full cluster-level sanity checks
 .github/workflows/
   sanity-checks.yml      PR-level Terraform + Ansible validation
+  cd-deploy.yml          CD pipeline (ArgoCD sync on merge to main)
   cluster-sanity.yml     Scheduled cluster health checks (every 6h)
   bootstrap.sh           One-command cluster setup
   restore-db.sh          Database restore from pgbackrest
