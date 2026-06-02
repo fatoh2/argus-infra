@@ -13,6 +13,15 @@ Argus Infra provides a complete, reproducible Kubernetes cluster running on Hetz
 | Layer | Tool | Purpose |
 |-------|------|---------|
 | **Infrastructure** | Terraform | Provision Hetzner VMs, GCP Compute Engine VMs, GKE clusters, AWS EC2 instances, networks, SSH keys |
+**A production-grade Kubernetes homelab platform** — provisioned with Terraform (Hetzner Cloud / GCP Compute Engine / GKE), configured with Ansible, and managed via GitOps with ArgoCD.
+
+## Overview
+
+Argus Infra provides a complete, reproducible Kubernetes cluster running on Hetzner Cloud VMs, a single VM on GCP Compute Engine, or a managed GKE cluster on Google Cloud. Everything is defined as code:
+
+| Layer | Tool | Purpose |
+|-------|------|---------|
+| **Infrastructure** | Terraform | Provision Hetzner VMs, GCP Compute Engine VMs, GKE clusters, networks, SSH keys |
 | **Configuration** | Ansible | Install k3s, configure nodes, firewall rules |
 | **GitOps** | ArgoCD | Declarative app deployment, self-healing |
 | **Ingress** | Traefik + cert-manager | HTTP routing, automatic TLS via Let's Encrypt |
@@ -161,6 +170,8 @@ argus-infra/
 │   ├── modules/gcp-compute-engine/   # GCP VM Terraform module
 │   ├── modules/gcp-gke/              # GCP GKE Terraform module
 │   └── modules/aws-ec2/              # AWS EC2 Terraform module
+│   ├── modules/gcp-compute-engine/   # GCP VM Terraform module
+│   └── modules/gcp-gke/              # GCP GKE Terraform module
 ├── ansible/                 # k3s cluster configuration
 │   ├── inventory/
 │   ├── playbooks/
@@ -217,5 +228,6 @@ See [docs/cicd.md](docs/cicd.md) for full pipeline documentation and [docs/runbo
 - **Makefile-driven workflow** — `make lint`, `make validate`, `make plan`, `make install-tools`, `make local-up/down`, `make check-versions`, `make sanity`
 - **Local development** — k3d cluster for testing without cloud costs
 - **Multi-cloud support** — Hetzner Cloud (k3s cluster), GCP Compute Engine (single VM), GCP GKE (managed Kubernetes), and AWS EC2 (single VM) deployment options
+- **Multi-cloud support** — Hetzner Cloud (k3s cluster), GCP Compute Engine (single VM), and GCP GKE (managed Kubernetes) deployment options
 - **Automated CI/CD** — GitHub Actions validate every PR and deploy on merge to `main`
 - **Architecture Decision Records** — all significant decisions documented in `docs/adr/`

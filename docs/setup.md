@@ -1,6 +1,7 @@
 # Argus Infra Setup
 
 This document outlines the steps to set up the Argus Infrastructure repository — a Kubernetes homelab platform on Hetzner Cloud (k3s), GCP Compute Engine (single VM), GCP GKE (managed Kubernetes), or AWS EC2 (single VM) using Terraform, Ansible, and ArgoCD.
+This document outlines the steps to set up the Argus Infrastructure repository — a Kubernetes homelab platform on Hetzner Cloud (k3s), GCP Compute Engine (single VM), or GCP GKE (managed Kubernetes) using Terraform, Ansible, and ArgoCD.
 
 ## Prerequisites
 
