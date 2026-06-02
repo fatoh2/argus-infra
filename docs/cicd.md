@@ -28,37 +28,49 @@ Triggered on every PR opened against `develop` and every push to `develop`/`main
 
 **File:** `.github/workflows/cd-deploy.yml`
 
-Triggered on every push to `main`. Runs three sequential stages:
+Triggered on every push to `main` — but only when the push touches infrastructure-relevant paths:
+
+- `terraform/**`
+- `ansible/**`
+- `k8s/**`
+- `scripts/**`
+- `.github/workflows/cd-deploy.yml`
+
+Docs-only changes (e.g., `README.md`, `docs/*.md`) **do not** trigger the CD workflow.
+
+Runs three sequential stages:
 
 ### Stage 1: Lint
 
-| Step | What it does |
-|------|--------------|
-| Terraform Format | `terraform fmt -check -recursive` ensures consistent formatting |
-| Ansible Lint | `ansible-lint` enforces best practices |
-| ShellCheck | Static analysis for shell scripts in `scripts/` |
+| Step | What it does | Graceful skip |
+|------|--------------|---------------|
+| Check Critical Files | Ensures all required files exist (`main.tf`, `site.yml`, `install.yaml`, `cluster-sanity.sh`, `CLAUDE.md`, `README.md`) | Fails if any critical file is missing |
+| Terraform Format | `terraform fmt -check -recursive` ensures consistent formatting | Skips if `terraform/environments/homelab` directory doesn't exist |
+| Ansible Lint | `ansible-lint` enforces best practices | Skips if no Ansible playbooks or roles exist |
+| ShellCheck | Static analysis for shell scripts in `scripts/` | Always runs if `scripts/` exists |
 
 ### Stage 2: Build (Validate + Plan)
 
+| Step | What it does | Graceful skip |
+|------|--------------|---------------|
+| Terraform Validate | `terraform validate` confirms HCL syntax is correct | Skips if `terraform/environments/homelab` directory doesn't exist |
+| Terraform Plan | Dry-run plan to verify configuration compiles end-to-end | Skips if `terraform/environments/homelab` doesn't exist; also skips gracefully if `HCLOUD_TOKEN` secret is not configured (prints a message and exits 0) |
+
+> **Note:** The Terraform plan step no longer requires `HCLOUD_TOKEN` to be set. If the token is absent, it prints a warning and exits successfully. This allows the workflow to pass even before cluster secrets are configured.
+
+### Stage 3: Deploy (placeholder)
+
 | Step | What it does |
 |------|--------------|
-| Terraform Validate | `terraform validate` confirms HCL syntax is correct |
-| Terraform Plan | Dry-run plan to verify configuration compiles end-to-end |
-| Ansible Syntax | `ansible-playbook --syntax-check` validates playbook structure |
-| Critical Files | Ensures all required files exist |
+| Deploy placeholder | Prints a message explaining that `KUBECONFIG`, `ARGOCD_SERVER`, and `ARGOCD_TOKEN` must be set in repo secrets to enable actual deployment |
 
-### Stage 3: ArgoCD Sync
-
-| Step | What it does |
-|------|--------------|
-| Notify | Logs merge event details |
-| API Sync (optional) | Triggers ArgoCD sync via REST API if `ARGOCD_SERVER` and `ARGOCD_TOKEN` are configured |
+> **Note:** The deploy stage is currently a placeholder that gracefully skips until cluster secrets are configured. Once `KUBECONFIG`, `ARGOCD_SERVER`, and `ARGOCD_TOKEN` are set as repository secrets, this stage can be updated to trigger an ArgoCD sync.
 
 ### How ArgoCD GitOps Works
 
 ArgoCD is configured to watch the `main` branch of this repository. When a PR merges to `main`:
 
-1. GitHub Actions runs the CD workflow (lint → build → sync)
+1. GitHub Actions runs the CD workflow (lint → build → deploy) — only if the merge touches infrastructure paths
 2. ArgoCD detects the change in Git (either via webhook or its 3-minute polling interval)
 3. ArgoCD syncs the cluster state to match the manifests in `main`
 4. ArgoCD reports sync status (Synced/OutOfSync/Error) in the ArgoCD UI
@@ -85,6 +97,62 @@ If a webhook is not configured, the CD workflow can optionally trigger an ArgoCD
 3. On merge, the workflow calls the ArgoCD sync API on the `argocd-root` application
 
 This is optional — ArgoCD will auto-sync within its default 3-minute polling interval even without it.
+
+## Pipeline Diagram
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│  Developer   │     │  GitHub PR   │     │  ArgoCD     │
+│  pushes to   │────▶│  to develop  │────▶│  watches    │
+│  feature/    │     │              │     │  develop    │
+│  branch      │     │  CI: sanity  │     │  (preview)  │
+└─────────────┘     │  checks      │     └─────────────┘
+                    └──────┬───────┘
+                           │
+                           ▼
+                    ┌──────────────────────────────────────────┐
+                    │  PR merged to main                       │
+                    │  (only if infra paths changed)           │
+                    │                                          │
+                    │  CD Pipeline (path-filtered):            │
+                    │   1. Lint (fmt, ansible-lint, sh,        │
+                    │      critical files)                     │
+                    │   2. Build (validate, plan — guarded)    │
+                    │   3. Deploy (placeholder)                │
+                    └──────────────────┬───────────────────────┘
+                                       │
+                                       ▼
+                               ┌─────────────┐
+                               │  ArgoCD     │
+                               │  syncs to   │
+                               │  cluster    │
+                               │             │
+                               │  production │
+                               └─────────────┘
+```
+
+## Adding a New Service
+
+To add a new service to the GitOps pipeline:
+
+1. Create Kubernetes manifests in `k8s/<service>/`
+2. Add an ArgoCD Application manifest in `k8s/argocd/apps/`
+3. Open a PR to `develop` — CI validates
+4. Merge to `main` — CD deploys via ArgoCD
+
+## Troubleshooting
+
+| Symptom | Likely Cause | Fix |
+|---------|-------------|------|
+| CI fails on Terraform validate | Invalid HCL syntax | Run `terraform validate` locally |
+| CI fails on Terraform format | Inconsistent formatting | Run `terraform fmt -recursive` locally |
+| CI fails on Ansible lint | Ansible best practice violation | Run `ansible-lint` locally and fix warnings |
+| CI fails on ShellCheck | Shell script issue | Run `shellcheck scripts/*.sh` locally |
+| CD not triggered after merge | Push was docs-only | Check if the merge touched paths under `terraform/`, `ansible/`, `k8s/`, `scripts/`, or `.github/workflows/cd-deploy.yml` |
+| CD fails on Terraform plan | Config compiles but plan fails | Check terraform plan output in CI logs; ensure `HCLOUD_TOKEN` is set if you want a real plan |
+| CD deploy stage does nothing | Cluster secrets not configured | Set `KUBECONFIG`, `ARGOCD_SERVER`, and `ARGOCD_TOKEN` in repo secrets |
+| ArgoCD shows OutOfSync | Cluster state drifted from Git | Click "Sync" in ArgoCD UI or run `argocd app sync argocd-root` |
+| ArgoCD shows Error | Invalid manifest or missing resource | Check ArgoCD UI for detailed error message |
 
 ## Pipeline Diagram
 

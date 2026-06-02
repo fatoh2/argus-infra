@@ -72,7 +72,7 @@ argus-infra/
 │   └── adr/               # Architecture Decision Records
 └── .github/workflows/     # CI/CD pipeline
     ├── sanity-checks.yml  # PR-level Terraform + Ansible validation (CI)
-    ├── cd-deploy.yml      # CD pipeline (lint → build → ArgoCD sync)
+    ├── cd-deploy.yml      # CD pipeline (lint → build → deploy, path-filtered)
     └── cluster-sanity.yml # Cluster-level health checks (scheduled, gate job prevents false failures when disabled)
 ```
 
@@ -80,9 +80,9 @@ argus-infra/
 
 Argus Infra uses a three-stage CI/CD pipeline:
 
-1. **Lint** — runs on every PR and merge to `main` (Terraform fmt, Ansible lint, ShellCheck)
-2. **Build** — runs on every PR and merge to `main` (Terraform validate + plan, Ansible syntax check, critical file checks)
-3. **Deploy** — runs on every merge to `main` (triggers ArgoCD sync)
+1. **Lint** — runs on every PR and merge to `main` (Terraform fmt, Ansible lint, ShellCheck, critical file checks)
+2. **Build** — runs on every PR and merge to `main` (Terraform validate + plan, guarded to skip gracefully when directories or secrets are absent)
+3. **Deploy** — runs only on infrastructure-relevant merges to `main` (path-filtered: `terraform/**`, `ansible/**`, `k8s/**`, `scripts/**`, `.github/workflows/cd-deploy.yml`); docs-only pushes are skipped automatically
 
 See [docs/cicd.md](docs/cicd.md) for full pipeline documentation and [docs/runbooks.md](docs/runbooks.md) for operational procedures.
 

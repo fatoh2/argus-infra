@@ -263,16 +263,20 @@ Every PR to `develop` triggers the CI workflow (`.github/workflows/sanity-checks
 **Required to pass** before a PR can be merged to `develop`.
 
 ### CD: Continuous Deployment
-Every merge to `main` triggers the CD workflow (`.github/workflows/cd-deploy.yml`), which runs three sequential stages:
+Every merge to `main` triggers the CD workflow (`.github/workflows/cd-deploy.yml`) — but only when the merge touches infrastructure-relevant paths (`terraform/**`, `ansible/**`, `k8s/**`, `scripts/**`, or `.github/workflows/cd-deploy.yml`). Docs-only changes are skipped automatically.
 
-**Stage 1 — Lint:** Terraform format check, Ansible lint, ShellCheck
-**Stage 2 — Build:** Terraform validate + plan (dry-run), Ansible syntax check, critical files check
-**Stage 3 — Deploy:** ArgoCD sync notification + optional API sync
+The workflow runs three sequential stages:
+
+**Stage 1 — Lint:** Critical files check, Terraform format check, Ansible lint, ShellCheck
+**Stage 2 — Build:** Terraform validate + plan (guarded — skips gracefully if `HCLOUD_TOKEN` is not configured)
+**Stage 3 — Deploy:** Placeholder (prints instructions for setting up cluster secrets)
+
+All steps are guarded with directory/file existence checks so the workflow passes even when infrastructure directories or secrets are absent.
 
 The deployment flow:
-1. Lint stage runs code quality checks
-2. Build stage validates infrastructure config compiles end-to-end
-3. Deploy stage notifies ArgoCD of the change
+1. Lint stage runs code quality checks and verifies critical files exist
+2. Build stage validates infrastructure config compiles end-to-end (skips gracefully if no Terraform or no token)
+3. Deploy stage prints setup instructions (placeholder until cluster secrets are configured)
 4. ArgoCD detects the change (via webhook or polling) and syncs the cluster
 
 ### Cluster Health Monitoring

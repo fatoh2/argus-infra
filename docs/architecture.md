@@ -280,12 +280,17 @@ The `sanity-checks.yml` workflow runs on every PR to `develop` and every push to
 
 ### CD: Continuous Deployment
 
-The `cd-deploy.yml` workflow runs on every push to `main` (i.e., after a PR is merged). It performs:
+The `cd-deploy.yml` workflow runs on every push to `main` — but only when the push touches infrastructure-relevant paths (`terraform/**`, `ansible/**`, `k8s/**`, `scripts/**`, or `.github/workflows/cd-deploy.yml`). Docs-only changes are automatically skipped.
 
-| Step | What it does |
-|------|--------------|
-| Validate | Same sanity checks as CI (belt-and-suspenders) |
-| ArgoCD Sync | ArgoCD detects the change and syncs the cluster state |
+The workflow runs three sequential stages:
+
+| Stage | Steps | Graceful skip behavior |
+|-------|-------|------------------------|
+| **Lint** | Critical files check, Terraform format, Ansible lint, ShellCheck | Terraform/Ansible steps skip if directories absent |
+| **Build** | Terraform validate + plan | Plan skips gracefully if `HCLOUD_TOKEN` not configured |
+| **Deploy** | Placeholder (prints instructions) | Skips until `KUBECONFIG`, `ARGOCD_SERVER`, `ARGOCD_TOKEN` are set |
+
+All steps are guarded with existence checks so the workflow passes even when infrastructure directories or secrets are not yet configured.
 
 ArgoCD watches the `main` branch and automatically reconciles the cluster to match the manifests in Git. Sync can be triggered via:
 
