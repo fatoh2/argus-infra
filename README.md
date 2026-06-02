@@ -78,7 +78,7 @@ argus-infra/
 │   └── adr/                # Architecture Decision Records
 └── .github/workflows/      # CI/CD pipeline
     ├── sanity-checks.yml   # PR-level Terraform + Ansible validation, CD-level ArgoCD sync
-    ├── cd-deploy.yml       # CD pipeline (ArgoCD sync)
+    ├── cd-deploy.yml       # CD pipeline (lint → build → ArgoCD sync)
     └── cluster-sanity.yml  # Cluster-level health checks (scheduled)
 ```
 
