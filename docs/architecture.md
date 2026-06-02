@@ -73,317 +73,188 @@ The ArgoCD app-of-apps structure is defined in `k8s/argocd/apps/`:
 | `loki` | Helm chart (grafana/loki) | `monitoring` | Log aggregation |
 | `promtail` | Helm chart (grafana/promtail) | `monitoring` | Log collection agent |
 | `traefik` | Helm chart (traefik/traefik) | `traefik` | Ingress controller |
-| `cert-manager` | Helm chart (jetstack/cert-manager) | `cert-manager` | TLS certificate automation |
-| `security` | `k8s/security/network-policies/` | `default` | NetworkPolicies (default deny + explicit allow) |
+| `cert-manager` | Helm chart (cert-manager/cert-manager) | `cert-manager` | TLS certificate management |
+| `cluster-issuer` | `k8s/cluster-issuer/` | `cert-manager` | Let's Encrypt ClusterIssuer |
+| `databases` | `k8s/databases/` | `databases` | PostgreSQL, Redis |
+| `security` | `k8s/security/` | (cluster-wide) | NetworkPolicies, Pod Security, RBAC |
 
-## 6. Secret Management (External Secrets Operator)
+## 6. Observability (Prometheus, Grafana, Loki)
 
-Secrets are managed securely using External Secrets Operator (ESO) with Doppler as the external secrets provider. This approach ensures that sensitive credentials are never stored in Git and are dynamically injected into the cluster.
+Observability is a core feature of Argus Infra, providing comprehensive monitoring and logging capabilities.
 
-### Key Components:
-- **External Secrets Operator:** A Kubernetes operator that synchronizes secrets from external APIs (Doppler) into Kubernetes Secrets.
-- **Doppler:** A cloud-based secrets management platform that provides a centralized, auditable, and encrypted store for all environment variables and secrets.
-- **SecretStore:** A namespaced or cluster-scoped ESO resource that defines how to authenticate and connect to the external secrets provider (Doppler).
-- **ExternalSecret:** A namespaced ESO resource that declares which secrets to fetch from the external provider and how to map them into a Kubernetes Secret.
+### Prometheus Stack
+- **Deployment:** The Prometheus stack is deployed via the `kube-prometheus-stack` Helm chart, which includes Prometheus, Alertmanager, and various exporters.
+- **Service Monitors:** Pre-configured to scrape metrics from all cluster components and applications.
+- **Retention:** Metrics are retained for 30 days by default.
 
-### Workflow:
-1. A `SecretStore` is configured with a Doppler API token (stored as a Kubernetes Secret, bootstrapped manually).
-2. An `ExternalSecret` resource references the `SecretStore` and specifies which Doppler secrets to fetch.
-3. ESO periodically syncs the specified secrets from Doppler and creates/updates the corresponding Kubernetes `Secret`.
-4. Application pods reference the Kubernetes `Secret` as environment variables or volume mounts.
+### Grafana
+- **Deployment:** Grafana is deployed as a standalone ArgoCD application from `k8s/grafana/`, using the official Grafana Helm chart.
+- **Dashboards:** Pre-configured with the "Node Exporter Full" and "Kubernetes Cluster Overview" dashboards, provisioned via ConfigMaps.
+- **Datasources:** Prometheus and Loki are configured as default datasources.
+- **Ingress:** Accessible at `https://grafana.argus.local` via Traefik IngressRoute with automatic TLS.
+- **Storage:** Grafana uses a 5Gi PersistentVolumeClaim (`k8s/grafana/pvc.yaml`) mounted at `/var/lib/grafana` for persistent storage of dashboards, settings, and user data.
+
+### Loki & Promtail
+- **Loki:** Deployed via Helm for log aggregation, providing a scalable, multi-tenant log storage system.
+- **Promtail:** Deployed as a DaemonSet to collect logs from all nodes and forward them to Loki.
 
 ## 7. Ingress & TLS (Traefik + cert-manager)
 
-Traefik serves as the ingress controller, routing external HTTP/HTTPS traffic to internal services. cert-manager automates TLS certificate provisioning and renewal using Let's Encrypt.
+Argus Infra uses Traefik as its ingress controller, replacing the default k3s Traefik with a dedicated deployment managed via ArgoCD.
 
-### Key Components:
-- **Traefik:** A modern, cloud-native HTTP reverse proxy and load balancer. It handles ingress routing based on `IngressRoute` (Traefik's CRD) or standard Kubernetes `Ingress` resources.
-- **cert-manager:** A Kubernetes add-on that automates the issuance and renewal of TLS certificates from various issuers, including Let's Encrypt.
-- **ClusterIssuer:** A cluster-scoped cert-manager resource that defines how to obtain certificates from Let's Encrypt (using the HTTP-01 challenge via Traefik).
-- **Wildcard Certificate:** A single certificate covering `*.argus-infra.dev` is issued and automatically renewed, securing all subdomains.
+### Traefik
+- **Deployment:** Deployed via Helm chart (`traefik/traefik`) in the `traefik` namespace.
+- **Configuration:** Configured with `--providers.kubernetesingress` and `--providers.kubernetescrd` to support both standard Ingress resources and Traefik's custom CRD (IngressRoute).
+- **EntryPoints:** Configured for HTTP (port 80) and HTTPS (port 443) with automatic redirection from HTTP to HTTPS.
 
-### Traffic Flow:
-1. A DNS `A` record (e.g., `*.argus-infra.dev`) points to the public IP of the Traefik load balancer (or the node port).
-2. An incoming HTTPS request for `app.argus-infra.dev` hits Traefik.
-3. Traefik terminates TLS using the wildcard certificate managed by cert-manager.
-4. Traefik routes the request to the appropriate backend service based on the `IngressRoute` or `Ingress` rules.
-5. The backend service forwards the request to the application pods.
+### cert-manager
+- **Deployment:** Deployed via Helm chart (`cert-manager/cert-manager`) in the `cert-manager` namespace.
+- **ClusterIssuer:** Configured with a Let's Encrypt production ClusterIssuer for automatic TLS certificate issuance.
+- **Wildcard Certificate:** A wildcard certificate for `*.argus.local` is automatically requested and renewed.
 
-## 8. Observability (Prometheus, Grafana, Loki)
+## 8. Secrets Management (External Secrets Operator + Doppler)
 
-A comprehensive observability stack provides metrics collection, visualization, and log aggregation.
+Secrets are managed securely using External Secrets Operator (ESO) with Doppler as the backend.
 
-### Key Components:
-- **Prometheus (kube-prometheus-stack):** Collects and stores metrics from the cluster and applications. Includes:
-  - **Prometheus Server:** Scrapes metrics from configured targets.
-  - **Alertmanager:** Handles alerts based on Prometheus rules.
-  - **ServiceMonitors/PodMonitors:** CRDs that define which services/pods to scrape.
-- **Grafana:** Deployed via ArgoCD from `k8s/grafana/` as a standalone deployment (not part of kube-prometheus-stack). Provides dashboards for visualizing Prometheus metrics and Loki logs. Pre-configured with:
-  - Kubernetes cluster monitoring dashboards (CPU, memory, network).
-  - Prometheus datasource auto-configured via ConfigMap.
-  - Loki as a data source for log exploration.
-  - Ingress at `grafana.argus.local` with Traefik and automatic TLS via cert-manager.
-- **Loki:** A horizontally-scalable, highly-available log aggregation system. It indexes metadata (labels) rather than full-text, making it cost-effective.
-- **Promtail:** A log collector that runs on each node, shipping container logs to Loki.
+### External Secrets Operator
+- **Deployment:** Deployed via Helm chart in the `security` namespace.
+- **Secret Stores:** Configured to pull secrets from Doppler projects.
+- **External Secrets:** Define which secrets to sync from Doppler into Kubernetes Secrets.
 
-### Grafana Deployment Details
+### Doppler
+- **Backend:** Doppler serves as the central secrets management platform.
+- **Projects:** Each application (e.g., `argus-monitor`, `argus-ai`) has its own Doppler project.
+- **Integration:** ESO authenticates with Doppler using a service token stored in a Kubernetes Secret.
 
-Grafana is deployed as a standalone ArgoCD application (separate from the `monitoring` app that manages kube-prometheus-stack). The deployment consists of:
+## 9. Security (NetworkPolicies, Pod Security, RBAC)
 
-| Resource | File | Purpose |
-|----------|------|---------|
-| ArgoCD Application | `k8s/argocd/apps/grafana.yaml` | Declares the Grafana app for ArgoCD GitOps |
-| Deployment | `k8s/grafana/deployment.yaml` | Single replica running `grafana/grafana:11.0.0` on port 3000 |
-| Service | `k8s/grafana/service.yaml` | ClusterIP service exposing port 80 → 3000 |
-| Ingress | `k8s/grafana/ingress.yaml` | Traefik ingress at `grafana.argus.local` with TLS via cert-manager |
-| Datasource ConfigMap | `k8s/grafana/configmap-provisioning.yaml` | Pre-configures Prometheus datasource |
-| Dashboard ConfigMap | `k8s/grafana/configmap-dashboards.yaml` | Provisioned dashboards (Node Exporter Full, Kubernetes Cluster Overview) |
-| PVC | `k8s/grafana/pvc.yaml` | 5Gi persistent storage for Grafana data |
-| Secret Template | `k8s/grafana/secret-template.yaml` | Admin credentials template (managed via ESO in production) |
+Security is implemented at multiple layers to ensure least-privilege access and defense in depth.
 
-**Datasource:** Grafana is pre-configured with a Prometheus datasource pointing to the kube-prometheus-stack Prometheus service at `http://prometheus-kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090`.
+### Network Policies
+- **Default Deny:** A default-deny-all NetworkPolicy is applied to all namespaces, blocking all ingress and egress traffic by default.
+- **Explicit Allow:** Specific NetworkPolicies are created to allow necessary traffic:
+  - `allow-ingress-to-api`: Allows ingress traffic from Traefik to the API service.
+  - `allow-api-to-postgres`: Allows the API service to connect to PostgreSQL.
+  - `allow-api-to-redis`: Allows the API service to connect to Redis.
+  - `allow-solana-adapter-egress`: Allows the Solana adapter to make outbound connections to the Solana RPC.
 
-**Dashboards:** Two dashboards are provisioned via ConfigMap:
-- **Node Exporter Full** (`uid: node-exporter-full`) — Node-level CPU usage, memory usage, and resource utilization across all worker nodes.
-- **Kubernetes Cluster Overview** (`uid: kubernetes-cluster-overview`) — CPU usage by pod, memory usage by pod, and cluster-level resource health.
+### Pod Security Standards
+- **Restricted Profile:** All namespaces are labeled with `pod-security.kubernetes.io/enforce: restricted`, enforcing the most restrictive Pod Security Standard.
+- **Workload Compliance:** All pods must run with `runAsNonRoot: true`, `readOnlyRootFilesystem: true`, and dropped capabilities.
 
-Additional dashboards can be added by extending the `configmap-dashboards.yaml` ConfigMap.
+### RBAC
+- **Least-Privilege ServiceAccounts:** Each service has a dedicated ServiceAccount with minimum required permissions:
+  - `api-service`: No Kubernetes API access (zero permissions).
+  - `argocd-manager`: Cluster-admin access (required for ArgoCD to manage the cluster).
+  - `prometheus`: Read-only access to pods, services, and endpoints for metrics scraping.
 
-**Ingress:** Grafana is accessible at `https://grafana.argus.local` via Traefik ingress with automatic TLS from cert-manager (Let's Encrypt).
+## 10. CI/CD & Testing
 
-**Credentials:** Admin credentials are injected via the `grafana-admin-credentials` Kubernetes Secret (managed by External Secrets Operator in production). The secret provides `GF_SECURITY_ADMIN_USER` and `GF_SECURITY_ADMIN_PASSWORD` environment variables to the Grafana pod. See `k8s/grafana/secret-template.yaml` for the expected secret shape.
+Argus Infra uses a two-tier CI/CD approach with GitHub Actions:
 
-**Storage:** Grafana uses a 5Gi PersistentVolumeClaim (`k8s/grafana/pvc.yaml`) for `/var/lib/grafana`, backed by the cluster's default StorageClass (e.g., Longhorn, local-path, or Hetzner CSI). This ensures dashboards, settings, and user data persist across pod restarts.
+1. **CI (Continuous Integration)** — runs on every PR to `develop` via `.github/workflows/sanity-checks.yml`
+2. **CD (Continuous Deployment)** — runs on every merge to `main` via `.github/workflows/cd-deploy.yml`
 
+The pipeline is designed to catch issues early and ensure cluster reliability.
 
-## 9. Security (Kubernetes NetworkPolicies)
+### CI: Sanity Checks (PR-level)
 
-Argus Infra enforces least-privilege network access between pods using Kubernetes NetworkPolicies. A **default-deny** approach is applied to all namespaces, with explicit allow rules for legitimate traffic flows.
+The `sanity-checks.yml` workflow runs on every PR to `develop` and every push to `develop`/`main`. It validates:
 
-### Default Deny
+| Step | What it checks |
+|------|----------------|
+| Terraform Format | `terraform fmt -check` ensures consistent formatting |
+| Terraform Validate | `terraform validate` on the homelab environment |
+| Terraform Plan | Dry-run plan (targeting network module only) to catch config errors |
+| Ansible Syntax | `ansible-playbook --syntax-check` validates playbook structure |
+| Ansible Lint | `ansible-lint` enforces best practices across all playbooks and roles |
+| ShellCheck | Static analysis for shell scripts in `scripts/` |
+| Critical Files | Ensures all required files exist (manifests, configs, docs) |
 
-A `default-deny-all` NetworkPolicy is applied to the following namespaces, blocking all ingress and egress traffic by default:
+### CD: Continuous Deployment
 
-- `databases`
-- `default`
-- `monitoring`
-- `ingress`
-- `traefik`
-- `cert-manager`
-- `external-secrets-operator`
-- `argocd`
+The `cd-deploy.yml` workflow runs on every push to `main` (i.e., after a PR is merged). It performs:
 
-### Explicit Allow Rules
+| Step | What it does |
+|------|--------------|
+| Validate | Same sanity checks as CI (belt-and-suspenders) |
+| ArgoCD Sync | ArgoCD detects the change and syncs the cluster state |
 
-| Policy | Namespace | Source | Destination | Port | Purpose |
-|--------|-----------|--------|-------------|------|---------|
-| `allow-api-to-postgres` | databases | `api-service` (label) | `postgres` (pod) | TCP 5432 | Application database access |
-| `allow-api-to-redis` | databases | `api-service` (label) | `redis` (pod) | TCP 6379 | Application cache access |
-| `allow-solana-adapter-egress` | default | `solana-adapter` (label) | Internet (HTTPS) | TCP 443 | Blockchain RPC calls (RFC1918 excluded) |
-| `allow-ingress-to-api` | default | `ingress` namespace | `api-service` (pod) | TCP 3000 | Ingress to application traffic |
+ArgoCD watches the `main` branch and automatically reconciles the cluster to match the manifests in Git. Sync can be triggered via:
 
-### Deployment
+- **Webhook** (recommended) — ArgoCD receives a GitHub webhook on push and syncs within seconds
+- **Polling** (fallback) — ArgoCD polls the Git repository every 3 minutes by default
 
-NetworkPolicies are deployed via ArgoCD as part of the `security` application, which sources from `k8s/security/network-policies/`. The app-of-apps root application includes `security` in its list of child applications.
+See [docs/cicd.md](cicd.md) for full pipeline documentation, including webhook setup and troubleshooting.
 
-### Risks & Considerations
+### Cluster Health Monitoring
 
-- Applying default-deny to the `argocd` namespace may interfere with ArgoCD's ability to sync applications across namespaces. Monitor after deployment.
-- Policies are label-based and will only take effect when pods with matching labels are deployed. Pre-created policies for future services (e.g., `solana-adapter`, `api-service`) are harmless until those pods exist.
-- NetworkPolicies require a CNI plugin that supports them (k3s uses Flannel by default, which does not enforce NetworkPolicies). For enforcement, install a CNI like Calico or Cilium.
+The `cluster-sanity.yml` workflow runs on a scheduled basis (every 6 hours) to perform cluster-level health checks:
 
+| Check | What it validates |
+|-------|-------------------|
+| Node Status | All nodes are in `Ready` state |
+| Pod Health | All pods in critical namespaces are running |
+| ArgoCD Sync | All ArgoCD applications are in `Synced` status |
+| Certificate Expiry | TLS certificates are not expiring within 30 days |
+| Disk Usage | Node disk usage is below 80% |
+| API Response | Cluster API is responsive |
 
-## 9.5 Pod Security Standards
-
-Argus Infra enforces Kubernetes [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/) at the **restricted** level across all application namespaces. This is the strictest built-in policy level and provides defense-in-depth alongside NetworkPolicies.
-
-### Namespace Labeling
-
-Each application namespace is labeled with Pod Security admission controller labels:
-
-```yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: monitoring
-  labels:
-    pod-security.kubernetes.io/enforce: restricted
-    pod-security.kubernetes.io/enforce-version: latest
-    pod-security.kubernetes.io/audit: restricted
-    pod-security.kubernetes.io/audit-version: latest
-    pod-security.kubernetes.io/warn: restricted
-    pod-security.kubernetes.io/warn-version: latest
-```
-
-The following namespaces are labeled (manifests in `k8s/security/pod-security/`):
-
-| Namespace | Purpose |
-|-----------|---------|
-| `monitoring` | Prometheus, Grafana, Loki, Promtail |
-| `databases` | PostgreSQL, Redis |
-| `ingress` | Traefik, cert-manager, wildcard TLS |
-| `traefik` | Traefik ingress controller |
-| `cert-manager` | cert-manager operator |
-| `default` | General application workloads |
-
-### Workload Compliance
-
-All workloads deployed to restricted namespaces must comply with the restricted profile. Key requirements enforced by the admission controller:
-
-| Requirement | Example Configuration |
-|-------------|----------------------|
-| **Run as non-root** | `securityContext.runAsNonRoot: true` |
-| **No privilege escalation** | `securityContext.allowPrivilegeEscalation: false` |
-| **Drop all capabilities** | `securityContext.capabilities.drop: [ALL]` |
-| **Read-only root filesystem** | `securityContext.readOnlyRootFilesystem: true` |
-| **Seccomp profile** | `securityContext.seccompProfile.type: RuntimeDefault` |
-
-### Updated Workloads
-
-The following workloads have been updated to comply with the restricted profile:
-
-- **Grafana Deployment** (`k8s/grafana/deployment.yaml`):
-  - Pod-level: `runAsNonRoot: true`, `runAsUser: 472`, `runAsGroup: 472`, `fsGroup: 472`, `seccompProfile: RuntimeDefault`
-  - Container-level: `allowPrivilegeEscalation: false`, `readOnlyRootFilesystem: true`, `capabilities.drop: [ALL]`
-  - Added `emptyDir` volume mounted at `/tmp` for Grafana temp files
-
-- **Postgres Backup CronJob** (`k8s/postgres-backup-cronjob.yaml`):
-  - Pod-level: `runAsNonRoot: true`, `seccompProfile: RuntimeDefault`
-  - Container-level: `allowPrivilegeEscalation: false`, `readOnlyRootFilesystem: true`, `capabilities.drop: [ALL]`
-  - Added `emptyDir` volume mounted at `/tmp`
-
-### Applying the Policies
-
-```bash
-# Apply namespace labels
-kubectl apply -f k8s/security/pod-security/
-
-# Verify enforcement
-kubectl describe ns monitoring
-# Should show: pod-security.kubernetes.io/enforce: restricted
-```
-
-### Risks & Considerations
-
-- The `amazon/aws-cli:latest` image used in the Postgres Backup CronJob may run as root by default. If the CronJob fails after applying the restricted profile, switch to a non-root AWS CLI image or adjust the securityContext.
-- `readOnlyRootFilesystem: true` requires all writable paths to be explicitly mounted as `emptyDir` volumes. Any workload that writes to its container filesystem without an `emptyDir` mount will fail.
-- Grafana's default image runs as user 472, which satisfies `runAsNonRoot: true`. If using a custom Grafana image, verify the user ID.
-- The `kube-system` and `argocd` namespaces are intentionally not labeled with the restricted profile, as system-level components may require elevated privileges.
-
-
-## 9.6 RBAC — Least-Privilege ServiceAccounts
-
-Argus Infra enforces least-privilege Kubernetes RBAC by creating dedicated ServiceAccounts for each service, scoped to the minimum permissions required. This follows the principle of least privilege and limits the blast radius of a compromised pod.
-
-### ServiceAccounts
-
-The following ServiceAccounts are defined in `k8s/security/rbac/`:
-
-| ServiceAccount | Namespace | Permissions | Rationale |
-|----------------|-----------|-------------|-----------|
-| `api-service` | `default` | None (no k8s API access) | Application pods do not need to interact with the Kubernetes API |
-| `argocd-manager` | `argocd` | Full management of namespaces, apps, RBAC, CRDs (read-only), and all namespaced resources | ArgoCD needs to create and manage resources across namespaces |
-| `prometheus` | `monitoring` | Read-only (get/list/watch) on nodes, pods, services, deployments, ingresses, and monitoring.coreos.com resources | Prometheus scrapes metrics and needs discovery but should never create or modify resources |
-
-### Key Design Decisions
-
-- **`automountServiceAccountToken: false`** is set on the `api-service` ServiceAccount since it has no k8s API access. This eliminates the attack surface of a mounted token.
-- **No wildcard verbs** — ArgoCD's ClusterRole uses explicit verbs per resource type (e.g., `get`, `list`, `watch`, `create`, `update`, `patch`, `delete`) rather than `["*"]`.
-- **Read-only for Prometheus** — Prometheus only needs to discover targets and read metrics. It has no create/update/delete permissions.
-
-### Verification
-
-```bash
-# api-service has zero k8s API access
-kubectl auth can-i list pods --as=system:serviceaccount:default:api-service
-# → no
-
-# Prometheus is read-only
-kubectl auth can-i create pods --as=system:serviceaccount:monitoring:prometheus
-# → no
-kubectl auth can-i get pods --as=system:serviceaccount:monitoring:prometheus
-# → yes
-
-# ArgoCD can still manage resources
-kubectl auth can-i create deployments --as=system:serviceaccount:argocd:argocd-manager
-# → yes
-```
-
-### Deployment
-
-RBAC resources are deployed via ArgoCD as part of the `security` application, which sources from `k8s/security/` (a kustomization that includes both `network-policies` and `rbac` subdirectories).
-
-
-## 10. CI/CD Pipeline & Testing
-
-Argus Infra uses GitHub Actions for continuous integration and cluster health monitoring. The pipeline is designed to catch issues early and ensure cluster reliability.
-
-### Sanity Checks (PR-level)
-
-The `sanity-checks.yml` workflow runs on every pull request to `develop` or `main`, and on every push to those branches. It validates:
-
-| Check | Tool | What it validates |
-|-------|------|-------------------|
-| Terraform Validate | `terraform validate` | Configuration syntax and internal consistency |
-| Terraform Format | `terraform fmt -check -recursive` | Code style compliance |
-| Terraform Plan | `terraform plan` | Execution plan (syntax-only, no apply) |
-| Ansible Syntax | `ansible-playbook --syntax-check` | Playbook and role syntax |
-| Ansible Lint | `ansible-lint` | Best practices and common errors |
-| ShellCheck | `shellcheck` (advisory) | Shell script quality |
-| Critical Files | File existence checks | All required config files are present |
-
-### Cluster Sanity (Scheduled)
-
-The `cluster-sanity.yml` workflow runs every 6 hours (and can be triggered manually via `workflow_dispatch`). It requires a running cluster and the `CLUSTER_SANITY_ENABLED` repository variable set to `true`. It checks:
-
-- **Cluster connectivity** — `kubectl cluster-info`
-- **Node health** — all nodes are `Ready`
-- **Pod health** — all pods in key namespaces are running
-- **ArgoCD app health** — all ArgoCD applications are `Synced` and `Healthy`
-- **Ingress reachability** — key endpoints respond correctly
-
-### Local Sanity Suite
-
-The `scripts/` directory contains scripts that replicate the CI checks locally:
-
-| Script | Purpose | Requires cluster? |
-|--------|---------|-------------------|
-| `run-sanity-checks.sh` | Terraform + Ansible + file structure validation | No |
-| `argocd-health.sh` | ArgoCD application health check | Yes |
-| `cluster-sanity.sh` | Full cluster-level sanity (nodes, pods, ArgoCD, ingress) | Yes |
-
-Run `./scripts/run-sanity-checks.sh` before committing to catch issues early.
-
-## 11. Data Flow Summary
+## 11. Data Flow
 
 ```
-User commits to Git
-       │
-       ▼
-  GitHub Actions ──► Sanity Checks (PR validation)
-       │
-       ▼
-  Git Repository (source of truth)
-       │
-       ▼
-  ArgoCD (polls Git, syncs cluster)
-       │
-       ▼
-  Kubernetes Cluster
-       │
-       ├──► Traefik (ingress, TLS termination)
-       ├──► Application Pods
-       ├──► Prometheus (metrics)
-       ├──► Loki (logs)
-       ├──► External Secrets (Doppler)
-       ├──► RBAC (least-privilege ServiceAccounts)
-       └──► NetworkPolicies (default deny, least-privilege)
+User → Traefik (Ingress) → cert-manager (TLS) → Service → Pod
+                                                      │
+                                                      ├── PostgreSQL (databases namespace)
+                                                      ├── Redis (databases namespace)
+                                                      └── External Services (via Egress)
 ```
 
-## 12. Design Decisions
+1. A user makes an HTTPS request to `https://grafana.argus.local`.
+2. Traefik terminates TLS using the wildcard certificate managed by cert-manager.
+3. Traefik routes the request to the Grafana service in the `monitoring` namespace.
+4. Grafana queries Prometheus for metrics and Loki for logs.
+5. All inter-pod communication is governed by NetworkPolicies.
 
-Key architecture decisions are documented as Architecture Decision Records (ADRs) in `docs/adr/`:
+## 12. Backup & Disaster Recovery
 
-- **ADR-0001:** Hetzner Cloud VM provisioning with Terraform
-- **ADR-0002:** k3s vs kubeadm for Kubernetes cluster
-- **ADR-0003:** ArgoCD for GitOps
+### PostgreSQL Backups
+- **Tool:** pgbackrest
+- **Schedule:** Daily full backups, hourly incremental backups
+- **Destination:** Backblaze B2 (S3-compatible object storage)
+- **Retention:** 30 days of daily backups, 12 monthly backups
+
+### Restore Procedure
+See [docs/runbooks.md](runbooks.md) for detailed restore procedures, including:
+- Point-in-time recovery
+- Full cluster restore
+- Individual database restore
+
+## 13. Design Decisions
+
+### Why k3s over kubeadm?
+- **Simplicity:** Single binary installation, embedded etcd, built-in CoreDNS and Traefik.
+- **Resource Efficiency:** Lower memory and CPU footprint, ideal for homelab environments.
+- **Compatibility:** Fully compliant with the Kubernetes API, ensuring compatibility with all standard tools (ArgoCD, Prometheus, etc.).
+
+### Why Traefik over NGINX Ingress?
+- **Dynamic Configuration:** Traefik supports automatic service discovery and dynamic configuration updates without reloads.
+- **CRD Support:** Traefik's IngressRoute CRD provides more flexible routing rules compared to standard Ingress resources.
+- **Built-in Let's Encrypt:** Traefik has native support for automatic TLS certificate management, though we use cert-manager for consistency across the cluster.
+
+### Why ArgoCD over Flux?
+- **Maturity:** ArgoCD has a more mature ecosystem and wider community adoption.
+- **UI:** ArgoCD provides a comprehensive web UI for managing applications and monitoring sync status.
+- **App-of-Apps:** ArgoCD's app-of-apps pattern allows for modular and scalable management of cluster components.
+
+### Why External Secrets Operator over Sealed Secrets?
+- **Dynamic Updates:** ESO can automatically update secrets when they change in Doppler, without requiring a new commit.
+- **Centralized Management:** Secrets are managed in Doppler, providing a single source of truth for all secrets across all environments.
+- **Audit Trail:** Doppler provides detailed audit logs for all secret access and changes.
+
+## 14. Future Considerations
+
+- **Multi-Node Control Plane:** For production environments, consider adding multiple control plane nodes for high availability.
+- **Cluster Autoscaling:** Implement cluster autoscaler to automatically add/remove worker nodes based on resource utilization.
+- **Service Mesh:** Evaluate Istio or Linkerd for advanced traffic management, observability, and security features.
+- **Disaster Recovery:** Implement cross-region backup and recovery for the entire cluster state.

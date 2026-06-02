@@ -123,202 +123,81 @@ Ansible playbooks are idempotent. To rollback a configuration:
 ### ArgoCD Application Rollback
 ArgoCD allows easy rollbacks to previous application versions.
 1.  **ArgoCD UI**: In the ArgoCD UI, navigate to the application, select "History and Rollback," and choose the desired previous version to roll back to.
-2.  **Git Revert**: Alternatively, revert the Kubernetes manifest changes in your application's Git repository. ArgoCD will detect this and sync the older manifests.
-
-### Grafana Rollback
-1.  **Revert Git**: Revert the Grafana manifest changes in `k8s/grafana/`.
-2.  **ArgoCD Sync**: ArgoCD will revert Grafana to the previous state.
-3.  **Emergency Workaround**: If ArgoCD sync is broken, delete the Grafana deployment directly:
-    ```bash
-    kubectl delete deployment grafana -n monitoring
-    kubectl delete configmap grafana-dashboards grafana-datasource-config grafana-datasources -n monitoring
-    ```
-    ArgoCD will recreate them from the last synced state.
-
-### NetworkPolicy Rollback
-1.  **Revert Git**: Revert the NetworkPolicy manifest changes in `k8s/security/network-policies/`.
-2.  **ArgoCD Sync**: ArgoCD will revert the policies. Note that removing a `default-deny-all` policy will immediately open all pod traffic in that namespace.
-3.  **Emergency Workaround**: If ArgoCD sync is broken, delete policies directly:
-    ```bash
-    kubectl delete networkpolicy -n <namespace> default-deny-all
-    ```
-
-
-
-
-### RBAC ServiceAccount Rollback
-1.  **Revert Git**: Revert the RBAC manifest changes in `k8s/security/rbac/`.
-2.  **ArgoCD Sync**: ArgoCD will revert the RBAC resources.
-3.  **Emergency Workaround**: If ArgoCD sync is broken, delete or patch resources directly:
-    ```bash
-    kubectl delete serviceaccount api-service -n default
-    kubectl delete clusterrole argocd-manager-cluster-role
-    kubectl delete clusterrolebinding argocd-manager-cluster-role-binding
-    ```
-
-### Pod Security Standards Rollback
-1.  **Revert Git**: Revert the namespace label changes in `k8s/security/pod-security/`.
-2.  **ArgoCD Sync**: ArgoCD will revert the namespace labels, removing the restricted profile enforcement.
-3.  **Emergency Workaround**: If ArgoCD sync is broken, remove labels directly:
-    ```bash
-    kubectl label ns monitoring pod-security.kubernetes.io/enforce- pod-security.kubernetes.io/audit- pod-security.kubernetes.io/warn-
-    ```
-4.  **Revert Workload Changes**: If a workload's `securityContext` changes caused issues, revert those changes in Git and sync via ArgoCD.
+2.  **Git Revert**: Alternatively, revert the Kubernetes manifest changes in your application's Git repository. ArgoCD will detect this and sync the cluster back to the previous state.
 
 ## 3. Scaling
-Scaling in Argus Infra primarily involves adding or removing virtual machines and configuring k3s to utilize them.
 
-### Scaling VMs (Hetzner)
-1.  **Modify Terraform**: Update the `count` or define new VM resources in `terraform/environments/homelab/main.tf`.
-2.  **Apply Terraform**:
-    ```bash
-    cd terraform/environments/homelab
-    terraform apply
-    ```
-    This will provision new VMs.
+### Adding Worker Nodes
+1.  **Update Terraform**: Increase the `worker_count` variable in `terraform/environments/homelab/terraform.tfvars`.
+2.  **Apply Terraform**: Run `terraform apply` to provision the new VM.
+3.  **Update Ansible Inventory**: Add the new worker IP to `ansible/inventory/homelab.yml`.
+4.  **Run Ansible**: Run `ansible-playbook -i inventory/homelab.yml playbooks/site.yml` to join the new node to the cluster.
 
-### Adding k3s Agents
-1.  **Update Ansible Inventory**: Add the IP addresses of the newly provisioned VMs to `ansible/inventory/homelab.yml` under the `k3s-agent` group.
-2.  **Run Ansible Playbook**:
-    ```bash
-    cd ansible
-    ansible-playbook -i inventory/homelab.yml playbooks/site.yml
-    ```
-    Ansible will install k3s agents on the new VMs, joining them to the cluster.
+### Removing Worker Nodes
+1.  **Drain the Node**: `kubectl drain k8s-worker-X --ignore-daemonsets --delete-emptydir-data`
+2.  **Delete the Node**: `kubectl delete node k8s-worker-X`
+3.  **Update Terraform**: Decrease the `worker_count` variable.
+4.  **Apply Terraform**: Run `terraform apply` to destroy the VM.
 
-### Scaling Applications (Kubernetes)
-For applications deployed via ArgoCD, scaling is managed within Kubernetes:
-1.  **Modify Kubernetes Manifests**: Update the `replicas` count in your Deployment manifests.
-2.  **Commit and Push**: Push the updated manifests to your application's Git repository. ArgoCD will sync the changes, and Kubernetes will scale your application pods.
+## 4. Backup and Restore
 
-## 4. Running Sanity Checks
+### PostgreSQL Backup (pgbackrest)
+Backups are automated via a CronJob in `k8s/postgres-backup-cronjob.yaml`.
 
-The repository includes a local sanity check suite to validate infrastructure code before committing.
-
-### Local Sanity Suite
-Run from the repository root:
+**Manual Backup:**
 ```bash
-# Basic checks (Terraform, Ansible, file structure)
-./scripts/run-sanity-checks.sh
-
-# Verbose output
-./scripts/run-sanity-checks.sh --verbose
-
-# Skip ansible-lint (if not installed)
-./scripts/run-sanity-checks.sh --skip-ansible-lint
+kubectl create job --from=cronjob/postgres-backup manual-backup -n databases
 ```
 
-### Cluster-Level Checks (requires running cluster)
+**Verify Backup:**
 ```bash
-# Full cluster sanity (nodes, pods, ArgoCD apps, ingress)
-./scripts/cluster-sanity.sh --verbose
-
-# ArgoCD-specific health check
-./scripts/argocd-health.sh --verbose
+kubectl logs job/manual-backup -n databases
 ```
 
-### CI Pipeline
-- **Sanity Checks** run automatically on every PR to `develop` or `main`, and on push to those branches.
-- **Cluster Sanity** runs every 6 hours via scheduled GitHub Actions workflow (requires `CLUSTER_SANITY_ENABLED` repository variable).
-
-## 5. Troubleshooting
-
-### General Troubleshooting Steps
--   **Check Logs**: Review logs of relevant components (VMs, k3s, ArgoCD, application pods).
--   **Verify Status**: Check the status of Kubernetes nodes, pods, deployments, and services.
--   **Network Connectivity**: Ensure proper network connectivity between components.
-
-### Terraform Troubleshooting
--   **Syntax Errors**: `terraform validate` can help catch syntax issues.
--   **State Issues**: If Terraform state gets corrupted, use `terraform state rm` or `terraform import` with extreme caution. Always back up your state.
--   **Hetzner API Errors**: Verify your Hetzner API token and ensure it has the necessary permissions.
-
-### Ansible Troubleshooting
--   **Connectivity**: Ensure Ansible can connect to target VMs (SSH access, correct credentials).
--   **Idempotency Issues**: If a playbook fails, fix the issue and re-run. Ansible is designed to be idempotent.
--   **Verbose Output**: Run playbooks with `-vvv` for more detailed debugging information.
-
-### k3s Troubleshooting
--   **Node Status**: `kubectl get nodes` to check if all nodes are `Ready`.
--   **Pod Status**: `kubectl get pods -A` to check if all pods are running.
--   **Logs**: `kubectl logs <pod-name> -n <namespace>` to view pod logs.
--   **Describe**: `kubectl describe pod <pod-name> -n <namespace>` for detailed pod information.
-
-### NetworkPolicy Troubleshooting
--   **Verify Policies are Applied**:
+### Restore from Backup
+1.  **Identify the backup**: Check pgbackrest info:
     ```bash
-    kubectl get networkpolicies -A
+    kubectl exec -n databases deployment/postgres -- pgbackrest info
     ```
-    Each namespace should show a `default-deny-all` policy plus any explicit allow policies.
-
--   **Test Connectivity**:
+2.  **Restore**:
     ```bash
-    # Deploy a temporary test pod
-    kubectl run test-pod --image=busybox -n default --rm -it -- sh
-    
-    # Inside the pod, test connectivity
-    wget -qO- http://some-service.some-namespace:port
-    # If this times out, a NetworkPolicy is blocking it
+    kubectl apply -f k8s/databases/restore-job.yaml
     ```
+    See `docs/runbooks.md` for detailed restore procedures.
 
--   **Check Policy Descriptions**:
-    ```bash
-    kubectl describe networkpolicy -n <namespace> <policy-name>
-    ```
+## 5. Monitoring and Alerting
 
--   **CNI Support**: k3s uses Flannel by default, which does **not** enforce NetworkPolicies. If policies appear applied but traffic is not being blocked, install a CNI that supports NetworkPolicy enforcement (e.g., Calico or Cilium).
+### Accessing Grafana
+- **URL**: `https://grafana.argus.local`
+- **Default Credentials**: `admin` / `admin`
 
--   **ArgoCD Sync Issues**: If default-deny blocks ArgoCD from syncing applications across namespaces, you may need to add an allow policy for ArgoCD's service account or temporarily disable the default-deny on the `argocd` namespace.
+### Checking Prometheus Targets
+```bash
+kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-stack-prometheus 9090:9090
+# Then visit http://localhost:9090/targets
+```
 
--   **Pod Labels**: NetworkPolicies use pod selectors (labels). If a policy isn't working as expected, verify that the source/destination pods have the correct labels:
-    ```bash
-    kubectl get pods -n <namespace> --show-labels
-    ```
+### Viewing Logs in Loki
+- Use Grafana's Explore view with the Loki datasource.
+- Query example: `{namespace="monitoring"} |= "error"`
 
+## 6. Troubleshooting
 
-### Pod Security Standards Troubleshooting
--   **Pods Failing to Start After Labeling**: If pods in a namespace are stuck in `Pending` or `ContainerCreating` after applying the restricted profile, check the admission controller events:
-    ```bash
-    kubectl describe pod <pod-name> -n <namespace>
-    # Look for: "violates PodSecurity" in the Events section
-    ```
-    Common violations and fixes:
-    | Violation | Fix |
-    |-----------|-----|
-    | `runAsNonRoot` is required | Add `securityContext.runAsNonRoot: true` to pod spec |
-    | `readOnlyRootFilesystem` is required | Add `securityContext.readOnlyRootFilesystem: true` and mount `emptyDir` for writable paths |
-    | `capabilities.drop` is required | Add `securityContext.capabilities.drop: [ALL]` |
-    | `seccompProfile` is required | Add `securityContext.seccompProfile.type: RuntimeDefault` |
+### General Troubleshooting
 
--   **Grafana Fails to Start**: If Grafana cannot write to its filesystem, ensure the `emptyDir` volume for `/tmp` is present in the deployment:
-    ```bash
-    kubectl get deployment grafana -n monitoring -o yaml | grep -A5 emptyDir
-    ```
-
--   **Postgres Backup CronJob Fails**: The `amazon/aws-cli:latest` image may run as root. If the CronJob fails after applying the restricted profile:
-    ```bash
-    kubectl logs job/postgres-backup-<id> -n databases
-    ```
-    If the error is permission-related, switch to a non-root AWS CLI image or remove `runAsNonRoot: true` from the CronJob's securityContext.
-
--   **Temporarily Disable Enforcement**: To debug a namespace without the restricted profile blocking pods:
-    ```bash
-    kubectl label ns <namespace> pod-security.kubernetes.io/enforce- --overwrite
-    # Re-enable after debugging:
-    kubectl label ns <namespace> pod-security.kubernetes.io/enforce=restricted --overwrite
-    ```
-
--   **Check Policy Version**: Verify the enforce-version is compatible with your cluster:
-    ```bash
-    kubectl describe ns monitoring | grep enforce-version
-    ```
-    If using an older Kubernetes version (< 1.25), change `latest` to a specific version like `v1.24`.
-
-### ArgoCD Troubleshooting
--   **Sync Status**: Check the ArgoCD UI or CLI for sync status and errors.
--   **App Health**: `argocd app list` to see all applications and their health status.
--   **Logs**: `kubectl logs -n argocd deployment/argocd-application-controller` for controller logs.
--   **NetworkPolicy Interference**: If ArgoCD apps show `OutOfSync` or `Unknown` after applying default-deny, ArgoCD may be unable to reach resources across namespaces. See NetworkPolicy troubleshooting above.
+- **Pod CrashLoopBackOff**: Check logs with `kubectl logs <pod> -n <namespace>` and events with `kubectl describe pod <pod> -n <namespace>`.
+- **ArgoCD OutOfSync**: Check the ArgoCD UI for details. Common causes: manual changes to the cluster, missing ConfigMaps, or Helm chart issues.
+- **Certificate Issues**: Check cert-manager logs and certificate status:
+  ```bash
+  kubectl get certificates -A
+  kubectl describe certificate <name> -n <namespace>
+  ```
+- **Node NotReady**: Check node status and kubelet logs:
+  ```bash
+  kubectl describe node <node-name>
+  # SSH into the node and check:
+  sudo journalctl -u k3s-agent
+  ```
 
 ### Grafana Troubleshooting
 -   **Grafana Pod Not Starting**: Check pod logs for errors:
@@ -369,95 +248,77 @@ Run from the repository root:
     # Then visit http://localhost:9090/targets
     ```
 
-### Grafana Troubleshooting
--   **Grafana Pod Not Starting**: Check pod logs for errors:
-    ```bash
-    kubectl logs -n monitoring deployment/grafana
-    ```
-    Common issues:
-    - **Permission denied**: Grafana's `securityContext` may need `runAsUser: 472` (Grafana's default UID) or an `emptyDir` volume for `/var/lib/grafana`.
-    - **Datasource not found**: Verify the Prometheus datasource URL in `k8s/grafana/configmap-datasources.yaml`. The service DNS must match the actual Prometheus service name.
-    - **ConfigMap not mounted**: Check that the ConfigMaps referenced in the Deployment exist:
-      ```bash
-      kubectl get configmap -n monitoring | grep grafana
-      ```
+## 7. CI/CD Pipeline
 
--   **Grafana Not Accessible via Ingress**:
-    ```bash
-    # Check ingress status
-    kubectl get ingress -n monitoring grafana
-    # Check Traefik is routing correctly
-    kubectl get ingressroute -n monitoring
-    # Verify DNS resolves grafana.argus.local to the cluster IP
-    ```
-    If using a local cluster without DNS, add a hosts file entry:
-    ```
-    <CLUSTER_IP>  grafana.argus.local
-    ```
+### CI: Sanity Checks (PR-level)
+Every PR to `develop` triggers the CI workflow (`.github/workflows/sanity-checks.yml`), which runs:
+- Terraform format check
+- Terraform validate
+- Terraform plan (dry-run)
+- Ansible syntax check
+- Ansible lint
+- ShellCheck (shell script static analysis)
+- Critical files existence check
 
--   **Dashboards Not Showing**:
-    ```bash
-    # Verify dashboard ConfigMap exists and has content
-    kubectl get configmap grafana-dashboards -n monitoring -o yaml | head -20
-    # Check Grafana provisioning logs
-    kubectl logs -n monitoring deployment/grafana | grep -i provisioning
-    ```
-    If dashboards are missing, ensure the provisioning ConfigMap (`grafana-datasource-config`) has the correct `dashboards` provider section pointing to the dashboard ConfigMap.
-
--   **Default Credentials Not Working**: If `admin`/`admin` doesn't work, the password may have been changed. Reset by exec-ing into the pod:
-    ```bash
-    kubectl exec -n monitoring deployment/grafana -- grafana-cli admin reset-admin-password newpassword
-    ```
-
--   **Grafana Shows "No data" in Panels**:
-    ```bash
-    # Verify Prometheus is reachable from Grafana
-    kubectl exec -n monitoring deployment/grafana -- wget -qO- http://prometheus-kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/query?query=up
-    # Check Prometheus targets are up
-    kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-stack-prometheus 9090:9090
-    # Then visit http://localhost:9090/targets
-    ```
-
----
-
-## 6. CI/CD Pipeline
-
-### CI: Pull Request Validation
-Every PR to `develop` runs sanity checks automatically via GitHub Actions (`.github/workflows/sanity-checks.yml`).
-
-**What's checked:**
-- Terraform validate + format
-- Ansible syntax + lint
-
-**If CI fails:**
-1. Click "Details" on the failing check in the PR
-2. Fix the issue in your branch
-3. Push again — CI re-runs automatically
+**Required to pass** before a PR can be merged to `develop`.
 
 ### CD: Continuous Deployment
-Every merge to `main` triggers the CD workflow (`.github/workflows/cd-deploy.yml`).
+Every merge to `main` triggers the CD workflow (`.github/workflows/cd-deploy.yml`), which runs three sequential stages:
 
-**What happens:**
-1. Validation runs (same as CI)
-2. ArgoCD detects the change (via webhook or polling)
-3. ArgoCD syncs the cluster to match `main`
+**Stage 1 — Lint:** Terraform format check, Ansible lint, ShellCheck
+**Stage 2 — Build:** Terraform validate + plan (dry-run), Ansible syntax check, critical files check
+**Stage 3 — Deploy:** ArgoCD sync notification + optional API sync
 
-**Monitoring a deployment:**
+The deployment flow:
+1. Lint stage runs code quality checks
+2. Build stage validates infrastructure config compiles end-to-end
+3. Deploy stage notifies ArgoCD of the change
+4. ArgoCD detects the change (via webhook or polling) and syncs the cluster
+
+### Cluster Health Monitoring
+The `cluster-sanity.yml` workflow runs every 6 hours and checks:
+- All nodes are in `Ready` state
+- All pods in critical namespaces are running
+- All ArgoCD applications are in `Synced` status
+- TLS certificates are not expiring within 30 days
+- Node disk usage is below 80%
+- Cluster API is responsive
+
+## 8. Security Procedures
+
+### Network Policy Changes
+- All changes to `k8s/security/network-policies/` must be reviewed by the PM before merging.
+- Test policies in a non-production namespace first if possible.
+- After applying, verify connectivity for all affected services.
+
+### Secret Rotation
+Secrets are managed via Doppler. To rotate a secret:
+1. Update the secret in the Doppler dashboard.
+2. External Secrets Operator will automatically sync the new value to the cluster.
+3. Restart the affected pods to pick up the new secret:
+   ```bash
+   kubectl rollout restart deployment/<name> -n <namespace>
+   ```
+
+### Pod Security Violations
+If a pod is rejected due to Pod Security Standards:
+1. Check the violation details: `kubectl describe pod <pod> -n <namespace>`
+2. Update the pod's `securityContext` to comply with the restricted profile.
+3. Re-apply the manifest.
+
+## 9. Disaster Recovery
+
+### Full Cluster Restore
+1. Provision new VMs with Terraform.
+2. Install k3s with Ansible.
+3. Install ArgoCD and point it to the Git repository.
+4. ArgoCD will automatically sync all applications to their desired state.
+5. Restore PostgreSQL from the latest pgbackrest backup.
+
+### etcd Backup and Restore
+k3s uses embedded etcd. To backup:
 ```bash
-# Check ArgoCD app status
-argocd app list
-
-# Check sync status of root app
-argocd app get argocd-root
-
-# Watch sync in real-time
-argocd app sync argocd-root --watch
+kubectl exec -n kube-system etcd-<node-name> -- etcdctl snapshot save /tmp/etcd-snapshot.db
 ```
 
-**If ArgoCD sync fails:**
-1. Check the ArgoCD UI for error details
-2. Fix the manifest in a new branch
-3. Open a PR, merge to `develop`, then merge to `main`
-4. ArgoCD will re-sync automatically
-
-See `docs/cicd.md` for full pipeline documentation.
+To restore, follow the k3s etcd restoration guide.
