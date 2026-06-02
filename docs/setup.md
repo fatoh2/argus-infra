@@ -339,7 +339,7 @@ terraform apply
 
 ```bash
 # Using the SSH key configured in terraform.tfvars
-ssh argus@$(terraform output -raw public_ip)
+ssh argus@$(terraform output -raw instance_public_ip)
 
 # Or using gcloud (if you have the Google Cloud SDK installed)
 gcloud compute ssh argus-vm --zone=us-central1-a --project=<project-id>
@@ -350,7 +350,7 @@ gcloud compute ssh argus-vm --zone=us-central1-a --project=<project-id>
 After the VM boots (wait ~2 minutes), verify Docker and Docker Compose are installed:
 
 ```bash
-ssh argus@$(terraform output -raw public_ip) "docker --version && docker compose version"
+ssh argus@$(terraform output -raw instance_public_ip) "docker --version && docker compose version"
 ```
 
 ### Destroy the VM
@@ -493,7 +493,7 @@ terraform apply
 
 ```bash
 # Using the SSH key configured in terraform.tfvars
-ssh argus@$(terraform output -raw public_ip)
+ssh argus@$(terraform output -raw instance_public_ip)
 ```
 
 ### Verify Docker
@@ -501,7 +501,7 @@ ssh argus@$(terraform output -raw public_ip)
 After the instance boots (wait ~2 minutes), verify Docker and Docker Compose are installed:
 
 ```bash
-ssh argus@$(terraform output -raw public_ip) "docker --version && docker compose version"
+ssh argus@$(terraform output -raw instance_public_ip) "docker --version && docker compose version"
 ```
 
 ### Destroy the EC2 Instance

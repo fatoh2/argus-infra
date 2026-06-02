@@ -360,7 +360,7 @@ terraform plan
 terraform apply
 
 # Connect
-ssh argus@$(terraform output -raw public_ip)
+ssh argus@$(terraform output -raw instance_public_ip)
 ```
 
 ## 16. GCP GKE Module
@@ -509,7 +509,8 @@ module "argus_ec2" {
 | `instance_arn` | EC2 instance ARN |
 | `instance_state` | EC2 instance state |
 | `instance_type` | EC2 instance type |
-| `public_ip` | Public IP address (if Elastic IP enabled) |
+| `public_ip` | Public IP address (Elastic IP if enabled, otherwise ephemeral) |
+| `instance_public_ip` | Alias for `public_ip` — public IP address (Elastic IP if enabled, otherwise ephemeral) |
 | `private_ip` | Private IP address |
 | `public_dns` | Public DNS name |
 | `vpc_id` | VPC ID |
@@ -539,7 +540,7 @@ terraform plan
 terraform apply
 
 # Connect
-ssh argus@$(terraform output -raw public_ip)
+ssh argus@$(terraform output -raw instance_public_ip)
 ```
 
 ### What the module does NOT do

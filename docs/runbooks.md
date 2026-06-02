@@ -650,7 +650,7 @@ terraform plan
 terraform apply
 
 # 5. Connect
-ssh argus@$(terraform output -raw public_ip)
+ssh argus@$(terraform output -raw instance_public_ip)
 ```
 
 ### Destroy the VM
@@ -772,7 +772,7 @@ terraform plan
 terraform apply
 
 # 5. Connect
-ssh argus@$(terraform output -raw public_ip)
+ssh argus@$(terraform output -raw instance_public_ip)
 ```
 
 ### Destroy the EC2 Instance

@@ -77,10 +77,10 @@ cp terraform.tfvars.example terraform.tfvars
 terraform init && terraform apply
 
 # 2. Connect via SSH
-ssh argus@$(terraform output -raw public_ip)
+ssh argus@$(terraform output -raw instance_public_ip)
 
 # 3. Verify Docker is running
-ssh argus@$(terraform output -raw public_ip) "docker --version && docker compose version"
+ssh argus@$(terraform output -raw instance_public_ip) "docker --version && docker compose version"
 ```
 
 See the [GCP module documentation](docs/architecture.md#15-gcp-compute-engine-module) for full details.
@@ -125,10 +125,10 @@ cp terraform.tfvars.example terraform.tfvars
 terraform init && terraform apply
 
 # 2. Connect via SSH
-ssh argus@$(terraform output -raw public_ip)
+ssh argus@$(terraform output -raw instance_public_ip)
 
 # 3. Verify Docker is running
-ssh argus@$(terraform output -raw public_ip) "docker --version && docker compose version"
+ssh argus@$(terraform output -raw instance_public_ip) "docker --version && docker compose version"
 ```
 
 See the [AWS EC2 module documentation](docs/architecture.md#17-aws-ec2-module) for full details.
