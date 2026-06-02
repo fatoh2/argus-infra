@@ -17,7 +17,18 @@ bash scripts/install-tools.sh
 bash scripts/install-tools.sh --quiet   # minimal output
 ```
 
-The script is idempotent — re-running it skips already-installed tools. It targets Ubuntu/Debian 22.04+ and requires `sudo` access for binary installation to `/usr/local/bin/`.
+The script is idempotent — re-running it skips already-installed tools. It supports Ubuntu/Debian (22.04+), macOS, and Windows (Git Bash / WSL2). On Linux/macOS it requires `sudo` access for binary installation to `/usr/local/bin/`. On macOS, uses `sudo mv` + `sudo chmod` instead of `sudo install` for compatibility.
+
+### Key Improvements in v2
+
+| Feature | Description |
+|---------|-------------|
+| **Multi-OS detection** | `detect_os()` function catches Git Bash (`msys`/`cygwin`), WSL2 (`/proc/version`), macOS (`darwin*`), and Linux |
+| **GitHub API fallback** | If rate-limited, uses hardcoded fallback versions (Terraform 1.7.5, kubeseal v0.27.1) with a warning |
+| **macOS compat** | Uses `sudo mv` + `sudo chmod` instead of `sudo install -o root -g root` |
+| **PATH fix** | Adds `~/.local/bin` to PATH before verifying pip-installed Ansible |
+| **Explicit errors** | Failed `apt-get update` shows a clear warning instead of failing silently |
+| **Quiet mode** | `--quiet` flag for minimal output in automated/CI environments |
 
 ### Check Tool Versions
 
@@ -29,13 +40,13 @@ make check-versions
 bash scripts/versions.sh
 ```
 
-This prints versions for all tools plus Ansible collection versions and system info (OS, kernel, arch). Useful for debugging environment issues.
+This prints versions for Terraform, kubectl, Helm, k3d, Ansible, ArgoCD CLI, kubeseal, shellcheck, git, and Docker — plus system info (OS, kernel, arch). Useful for debugging environment issues.
 
 ### What Gets Installed
 
 | Tool | Version | Source |
 |------|---------|--------|
-| Terraform | 1.5.7 (pinned) | HashiCorp releases |
+| Terraform | 1.7.5 (pinned) | HashiCorp releases |
 | Ansible (ansible-core) | latest (apt) | Ubuntu repos |
 | kubectl | latest stable | Kubernetes releases |
 | Helm | v3.17.2 | Helm releases |
@@ -60,6 +71,8 @@ The root `Makefile` provides convenient shortcuts for common operations:
 | `make local-down` | Tear down local k3d cluster |
 | `make check-versions` | Print installed tool versions |
 | `make sanity` | Run full local sanity check suite |
+| `make setup-windows` | Show Windows setup guide |
+| `make bootstrap` | Run Windows bootstrap script (`BOOTSTRAP_WINDOWS.sh`) |
 
 All targets gracefully skip missing tools. Run `make` (or `make help`) to see the full list.
 

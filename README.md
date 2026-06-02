@@ -137,13 +137,17 @@ The project includes a `Makefile` with common infra operations. Run `make` or `m
 
 | Target | Description | Requires |
 |--------|-------------|----------|
-| `make lint` | Terraform fmt -check + ansible-lint + shellcheck | Installed tools |
+| `make help` | Print all available targets | — |
+| `make lint` | Terraform fmt -check + ansible-lint + shellcheck | Installed tools (skips gracefully if missing) |
 | `make validate` | Terraform init (no backend) + validate | Terraform |
 | `make plan` | Terraform plan (targets module.network) | `HCLOUD_TOKEN` env var |
-| `make install-tools` | Install CLI tools (Terraform, Ansible, kubectl, etc.) | sudo access |
-| `make local-up` | Create k3d cluster with ArgoCD, Prometheus, Loki | k3d, Helm |
-| `make local-down` | Destroy k3d cluster | k3d |
-| `make check-versions` | Show installed tool versions | Installed tools |
+| `make install-tools` | Install CLI tools (Terraform, Ansible, kubectl, k3d, etc.) | sudo access |
+| `make local-up` | Spin up local k3d cluster for testing | k3d |
+| `make local-down` | Tear down local k3d cluster | k3d |
+| `make check-versions` | Print installed tool versions | — |
+| `make sanity` | Run full local sanity check suite | Installed tools |
+
+> All targets gracefully skip missing tools. Run `make` (or `make help`) to see the full list.
 
 ## Repository Structure
 
@@ -173,25 +177,34 @@ argus-infra/
 │   ├── monitoring/           # Prometheus, Grafana, Loki
 │   ├── ingress/              # Traefik, cert-manager
 │   └── system/               # System components (secrets, policies)
-├── scripts/                  # Utility scripts
-│   ├── install-tools.sh      # Automated CLI tool installation
-│   └── versions.sh           # Tool version checker
+├── scripts/                  # Operational and CI scripts
+│   ├── install-tools.sh      # One-command tool installation (Terraform, Ansible, kubectl, Helm, ArgoCD, k3d, kubeseal)
+│   ├── versions.sh           # Print all tool versions for debugging
+│   ├── run-sanity-checks.sh  # Local sanity suite (Terraform, Ansible, ArgoCD)
+│   ├── argocd-health.sh      # ArgoCD app health check
+│   ├── cluster-sanity.sh     # Full cluster-level sanity checks
+│   ├── bootstrap-argocd.sh   # ArgoCD bootstrap helper
+│   └── setup-agent.sh        # Agent setup script
 ├── docs/                     # Documentation
 │   ├── setup.md              # Full setup guide
-│   └── architecture.md       # Architecture documentation
+│   ├── architecture.md       # System architecture
+│   ├── runbooks.md           # Operational runbooks
+│   ├── cicd.md               # CI/CD pipeline overview
+│   ├── secrets.md            # Secrets management
+│   └── adr/                  # Architecture Decision Records
 ├── Makefile                  # Common operations
 └── README.md                 # This file
 ```
 
-## CI/CD
+## CI/CD Pipeline
 
-The repository uses GitHub Actions for CI/CD:
+Argus Infra uses a three-stage CI/CD pipeline:
 
-| Workflow | Trigger | Purpose |
-|----------|---------|---------|
-| **Sanity Checks** | PRs to develop/main | Terraform fmt, validate, Ansible syntax check, shellcheck |
-| **Cluster Sanity** | PRs to develop/main | k3d cluster creation, ArgoCD bootstrap, app deployment test |
-| **CD Deploy** | Push to main | Apply Terraform, run Ansible, sync ArgoCD apps |
+1. **Lint** — runs on every PR and merge to `main` (Terraform fmt, Ansible lint, ShellCheck)
+2. **Build** — runs on every PR and merge to `main` (Terraform validate + plan, Ansible syntax check, critical file checks)
+3. **Deploy** — runs only on infrastructure-relevant merges to `main` (path-filtered); docs-only pushes are skipped automatically
+
+See [docs/cicd.md](docs/cicd.md) for full pipeline documentation and [docs/runbooks.md](docs/runbooks.md) for operational procedures.
 
 ## License
 

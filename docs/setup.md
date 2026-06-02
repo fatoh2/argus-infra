@@ -20,11 +20,18 @@ The recommended way to install all required CLI tools is via the Makefile:
 make install-tools
 ```
 
-This is equivalent to running `bash scripts/install-tools.sh` and installs (or skips if already present):
+Or run the script directly:
+
+```bash
+bash scripts/install-tools.sh          # interactive
+bash scripts/install-tools.sh --quiet  # minimal output
+```
+
+This installs (or skips if already present):
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| **Terraform** | 1.5.7 (pinned) | Provision Hetzner Cloud VMs |
+| **Terraform** | 1.7.5 (pinned) | Provision Hetzner Cloud VMs |
 | **Ansible** (ansible-core) | latest | Configure k3s cluster |
 | **kubectl** | latest stable | Interact with Kubernetes |
 | **Helm** | 3.17.2 | Package manager for K8s |
@@ -34,7 +41,15 @@ This is equivalent to running `bash scripts/install-tools.sh` and installs (or s
 
 The script also installs required Ansible Galaxy collections from `ansible/requirements.yml` and `kubernetes.core`.
 
-> **Note:** The script targets Ubuntu/Debian (22.04+) and requires `sudo` access for binary installation to `/usr/local/bin/`. Each tool checks if already installed and skips if present. One tool failure doesn't block others.
+### Key Features
+
+- **Multi-OS detection** — automatically detects Windows (Git Bash), WSL2, macOS, and Linux
+- **Graceful fallbacks** — if GitHub API is rate-limited, uses hardcoded fallback versions (Terraform 1.7.5, kubeseal v0.27.1)
+- **PATH fix for Ansible** — adds `~/.local/bin` to PATH before verifying pip-installed Ansible
+- **Explicit error reporting** — failed `apt-get update` shows a clear warning instead of failing silently
+- **Quiet mode** — pass `--quiet` for minimal output during automated runs
+
+> **Note:** The script supports Ubuntu/Debian (22.04+), macOS, and Windows (Git Bash / WSL2). It requires `sudo` access for binary installation to `/usr/local/bin/` on Linux/macOS. Each tool checks if already installed and skips if present. One tool failure doesn't block others. On macOS, uses `sudo mv` + `sudo chmod` instead of `sudo install` for compatibility. On Windows, run inside Git Bash or WSL2.
 
 To verify all tools are installed correctly:
 
@@ -48,9 +63,23 @@ Or directly:
 bash scripts/versions.sh
 ```
 
+This prints versions for Terraform, kubectl, Helm, k3d, Ansible, ArgoCD CLI, kubeseal, shellcheck, git, and Docker — plus system info (OS, kernel, arch).
+
 ### Manual Installation (if needed)
 
 If you prefer to install tools individually, refer to each tool's official documentation.
+
+### Windows Setup
+
+On Windows, run the bootstrap script from **Git Bash** or **WSL2** to verify prerequisites:
+
+```bash
+make bootstrap
+# or directly:
+bash BOOTSTRAP_WINDOWS.sh
+```
+
+See [SETUP_WINDOWS.md](../SETUP_WINDOWS.md) for detailed Windows-specific instructions, including Docker Desktop with WSL2 backend setup.
 
 ## 1. Clone the Repository
 
