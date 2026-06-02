@@ -368,3 +368,52 @@ Run from the repository root:
     kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-stack-prometheus 9090:9090
     # Then visit http://localhost:9090/targets
     ```
+
+### Grafana Troubleshooting
+-   **Grafana Pod Not Starting**: Check pod logs for errors:
+    ```bash
+    kubectl logs -n monitoring deployment/grafana
+    ```
+    Common issues:
+    - **Permission denied**: Grafana's `securityContext` may need `runAsUser: 472` (Grafana's default UID) or an `emptyDir` volume for `/var/lib/grafana`.
+    - **Datasource not found**: Verify the Prometheus datasource URL in `k8s/grafana/configmap-datasources.yaml`. The service DNS must match the actual Prometheus service name.
+    - **ConfigMap not mounted**: Check that the ConfigMaps referenced in the Deployment exist:
+      ```bash
+      kubectl get configmap -n monitoring | grep grafana
+      ```
+
+-   **Grafana Not Accessible via Ingress**:
+    ```bash
+    # Check ingress status
+    kubectl get ingress -n monitoring grafana
+    # Check Traefik is routing correctly
+    kubectl get ingressroute -n monitoring
+    # Verify DNS resolves grafana.argus.local to the cluster IP
+    ```
+    If using a local cluster without DNS, add a hosts file entry:
+    ```
+    <CLUSTER_IP>  grafana.argus.local
+    ```
+
+-   **Dashboards Not Showing**:
+    ```bash
+    # Verify dashboard ConfigMap exists and has content
+    kubectl get configmap grafana-dashboards -n monitoring -o yaml | head -20
+    # Check Grafana provisioning logs
+    kubectl logs -n monitoring deployment/grafana | grep -i provisioning
+    ```
+    If dashboards are missing, ensure the provisioning ConfigMap (`grafana-datasource-config`) has the correct `dashboards` provider section pointing to the dashboard ConfigMap.
+
+-   **Default Credentials Not Working**: If `admin`/`admin` doesn't work, the password may have been changed. Reset by exec-ing into the pod:
+    ```bash
+    kubectl exec -n monitoring deployment/grafana -- grafana-cli admin reset-admin-password newpassword
+    ```
+
+-   **Grafana Shows "No data" in Panels**:
+    ```bash
+    # Verify Prometheus is reachable from Grafana
+    kubectl exec -n monitoring deployment/grafana -- wget -qO- http://prometheus-kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/query?query=up
+    # Check Prometheus targets are up
+    kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-stack-prometheus 9090:9090
+    # Then visit http://localhost:9090/targets
+    ```
