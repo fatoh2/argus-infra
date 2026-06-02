@@ -315,9 +315,14 @@ RBAC resources are deployed via ArgoCD as part of the `security` application, wh
 
 ## 10. CI/CD Pipeline & Testing
 
-Argus Infra uses GitHub Actions for continuous integration and cluster health monitoring. The pipeline is designed to catch issues early and ensure cluster reliability.
+Argus Infra uses a two-tier CI/CD approach with GitHub Actions:
 
-### Sanity Checks (PR-level)
+1. **CI (Continuous Integration)** — runs on every PR to `develop` via `.github/workflows/sanity-checks.yml`
+2. **CD (Continuous Deployment)** — runs on every merge to `main` via `.github/workflows/cd-deploy.yml`
+
+The pipeline is designed to catch issues early and ensure cluster reliability.
+
+### CI: Sanity Checks (PR-level)
 
 The `sanity-checks.yml` workflow runs on every pull request to `develop` or `main`, and on every push to those branches. It validates:
 
@@ -352,6 +357,24 @@ The `scripts/` directory contains scripts that replicate the CI checks locally:
 | `cluster-sanity.sh` | Full cluster-level sanity (nodes, pods, ArgoCD, ingress) | Yes |
 
 Run `./scripts/run-sanity-checks.sh` before committing to catch issues early.
+
+
+
+### CD: Continuous Deployment
+
+The `cd-deploy.yml` workflow runs on every push to `main` (i.e., after a PR is merged). It performs:
+
+| Step | What it does |
+|------|--------------|
+| Validate | Same sanity checks as CI (belt-and-suspenders) |
+| ArgoCD Sync | ArgoCD detects the change and syncs the cluster state |
+
+ArgoCD watches the `main` branch and automatically reconciles the cluster to match the manifests in Git. Sync can be triggered via:
+
+- **Webhook** (recommended) — ArgoCD receives a GitHub webhook on push and syncs within seconds
+- **Polling** (fallback) — ArgoCD polls the Git repository every 3 minutes by default
+
+See [docs/cicd.md](cicd.md) for full pipeline documentation, including webhook setup and troubleshooting.
 
 ## 11. Data Flow Summary
 

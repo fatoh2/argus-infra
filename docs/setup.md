@@ -340,8 +340,9 @@ If you have access to a running cluster, you can run additional checks:
 
 These scripts are also run automatically via GitHub Actions:
 - **Sanity Checks** — on every PR to `develop` or `main`, and on push to those branches
+- **CD Deploy** — on every merge to `main`, validates and triggers ArgoCD sync
 - **Cluster Sanity** — every 6 hours via scheduled workflow (requires `CLUSTER_SANITY_ENABLED` repository variable)
 
 ## Next Steps
 
-After the cluster is running and ArgoCD is deployed, the platform is ready for application deployments. See the [architecture document](architecture.md) for details on how components interact.
+After the cluster is running and ArgoCD is deployed, the platform is ready for application deployments. See the [architecture document](architecture.md) for details on how components interact, and the [CI/CD pipeline documentation](cicd.md) for how changes flow from Git to the cluster.

@@ -116,7 +116,7 @@ ArgoCD watches the `main` branch and automatically reconciles the cluster to mat
 - **Network Policies** — default-deny on all namespaces with explicit allow rules for least-privilege pod communication
 - **Pod Security Standards** — restricted profile enforced on all namespaces; workloads configured with `runAsNonRoot`, `readOnlyRootFilesystem`, and dropped capabilities
 - **Least-Privilege RBAC** — dedicated ServiceAccounts for each service with minimum required permissions; `api-service` has zero k8s API access
-- **CI/CD-validated** — Terraform validate + fmt, Ansible syntax check + lint, ShellCheck, critical file checks on every PR
+- **CI/CD-validated** — Terraform validate + fmt, Ansible syntax check + lint, ShellCheck, critical file checks on every PR; CD pipeline validates and triggers ArgoCD sync on merge to main
 - **Cluster health monitoring** — scheduled cluster sanity checks (nodes, pods, ArgoCD apps, ingress) every 6 hours
 - **Local sanity suite** — run `./scripts/run-sanity-checks.sh` before committing to catch issues early
 
