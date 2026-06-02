@@ -1,20 +1,16 @@
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
 metadata:
   name: grafana
   namespace: monitoring
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
-  ingressClassName: nginx # Assuming nginx ingress controller is installed
-  rules:
-  - host: grafana.infra.local
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: grafana
-            port:
-              number: 80
+  entryPoints:
+    - websecure
+  routes:
+  - match: Host(`grafana.argus.local`)
+    kind: Rule
+    services:
+    - name: grafana
+      port: 80
+  tls:
+    certResolver: letsencrypt
