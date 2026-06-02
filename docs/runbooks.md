@@ -2,7 +2,47 @@
 
 This document provides operational guidance for deploying, rolling back, scaling, and troubleshooting the Argus Infra platform.
 
-## 1. Deployment
+## 1. Tool Installation & Version Checks
+
+### Install Required CLI Tools
+
+Before working with the repo, install all required CLI tools:
+
+```bash
+# Install everything (Terraform, Ansible, kubectl, Helm, ArgoCD CLI, k3d, kubeseal)
+bash scripts/install-tools.sh
+
+# Quiet mode (minimal output)
+bash scripts/install-tools.sh --quiet
+```
+
+The script is idempotent — re-running it skips already-installed tools. It targets Ubuntu/Debian 22.04+ and requires `sudo` access for binary installation to `/usr/local/bin/`.
+
+### Check Tool Versions
+
+To verify all tools are installed and see their versions:
+
+```bash
+bash scripts/versions.sh
+```
+
+This prints versions for all tools plus Ansible collection versions and system info (OS, kernel, arch). Useful for debugging environment issues.
+
+### What Gets Installed
+
+| Tool | Version | Source |
+|------|---------|--------|
+| Terraform | 1.5.7 (pinned) | HashiCorp releases |
+| Ansible (ansible-core) | latest (apt) | Ubuntu repos |
+| kubectl | latest stable | Kubernetes releases |
+| Helm | v3.17.2 | Helm releases |
+| ArgoCD CLI | latest | GitHub releases |
+| k3d | latest | k3d releases |
+| kubeseal | latest | GitHub releases |
+
+The script also installs required Ansible Galaxy collections from `ansible/requirements.yml` and `kubernetes.core`.
+
+## 2. Deployment
 New deployments or updates to the infrastructure are primarily driven by changes in the Terraform or Ansible configurations, followed by ArgoCD syncing Kubernetes manifests.
 
 ### Terraform Changes (VMs, Networking)
@@ -96,7 +136,7 @@ When adding a new workload to a restricted namespace, ensure its `securityContex
 - Container-level: `allowPrivilegeEscalation: false`, `readOnlyRootFilesystem: true`, `capabilities.drop: [ALL]`
 - Add `emptyDir` volumes for any writable paths (e.g., `/tmp`)
 
-## 2. Rollback
+## 3. Rollback
 Rollbacks depend on the component being rolled back.
 
 ### Terraform Rollback
@@ -341,7 +381,7 @@ kubectl exec -n kube-system etcd-<node-name> -- etcdctl snapshot save /tmp/etcd-
 To restore, follow the k3s etcd restoration guide.
 
 
-## 7. Database Backup and Restore
+## 8. Database Backup and Restore
 
 ### 7.1 Overview
 
