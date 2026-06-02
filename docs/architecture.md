@@ -20,6 +20,7 @@ Argus Infra is a fully GitOps-driven Kubernetes homelab platform running on Hetz
 Argus Infra leverages Terraform (or OpenTofu) to provision the underlying virtual machine infrastructure on Hetzner Cloud. This ensures that the infrastructure is defined as code, enabling reproducibility, version control, and automated deployment.
 
 ### Key Components:
+- **ServiceMonitors:** Custom resources that Prometheus uses to discover and scrape metrics from Kubernetes services. PR #57 introduced ServiceMonitors for `argus-monitor` services (API, Chain Indexer, Solana Adapter) to automatically collect their metrics.
 - **Hetzner Cloud Project:** The entire infrastructure resides within a dedicated Hetzner Cloud project.
 - **Private Network:** A dedicated private network (`10.0.0.0/16`) and subnet (`10.0.1.0/24`) are created to facilitate secure communication between Kubernetes nodes, isolated from the public internet. This network is crucial for stable internal IP addressing for Kubernetes components.
 - **Virtual Machines:**
@@ -32,6 +33,7 @@ Argus Infra leverages Terraform (or OpenTofu) to provision the underlying virtua
 k3s is chosen as the Kubernetes distribution for its lightweight nature, ease of installation, and suitability for homelab and edge environments. It provides a fully compliant Kubernetes API with a reduced footprint.
 
 ### Key Components:
+- **ServiceMonitors:** Custom resources that Prometheus uses to discover and scrape metrics from Kubernetes services. PR #57 introduced ServiceMonitors for `argus-monitor` services (API, Chain Indexer, Solana Adapter) to automatically collect their metrics.
 - **k3s Server:** Runs on the `k8s-control` node, encompassing:
   - **API Server:** Exposes the Kubernetes API, acting as the front-end for the control plane.
   - **Controller Manager:** Runs controller processes, which watch the shared state of the cluster through the API server and make changes attempting to move the current state towards the desired state.

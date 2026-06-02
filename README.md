@@ -44,6 +44,7 @@ argus-infra/
 │   │   └── config/        # ArgoCD configuration
 │   ├── ingress/           # Traefik, cert-manager, TLS
 │   ├── monitoring/        # Prometheus stack
+│   ├── servicemonitors.yaml # Prometheus ServiceMonitors for argus-monitor services
 │   ├── grafana/           # Grafana deployment, dashboards, datasources, ingress
 │   ├── databases/         # PostgreSQL, Redis, backup CronJob
 │   ├── security/          # Security policies
