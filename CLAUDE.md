@@ -35,6 +35,8 @@ docs/
   runbooks.md       Operational procedures — always keep updated
   adr/              Architecture Decision Records
 scripts/
+  install-tools.sh       One-command tool installation (Terraform, Ansible, kubectl, Helm, ArgoCD, k3d, kubeseal)
+  versions.sh            Print all tool versions for debugging
   run-sanity-checks.sh   Local sanity suite (Terraform, Ansible, ArgoCD)
   argocd-health.sh       ArgoCD app health check
   cluster-sanity.sh      Full cluster-level sanity checks

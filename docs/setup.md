@@ -4,15 +4,45 @@ This document outlines the steps to set up the Argus Infrastructure repository �
 
 ## Prerequisites
 
-Before you begin, ensure you have the following installed on your local machine:
+Before you begin, ensure you have the following:
 
 - **Git** — for cloning the repository
-- **Terraform** (v1.0.0+) — for provisioning Hetzner Cloud VMs
-- **Ansible** (v2.10+) — for configuring the k3s cluster
-- **kubectl** — for interacting with the Kubernetes cluster
 - **Hetzner Cloud API Token** — create one in your Hetzner Cloud project under **Security > API Tokens**
+- **CLI tools** — install all required tools with one command (see below)
 
-> **ArgoCD CLI** is optional. It is only needed if you prefer CLI-based management of ArgoCD applications over the Web UI or `kubectl`. Installation instructions are provided in the ArgoCD section below.
+### Automated Tool Installation
+
+The recommended way to install all required CLI tools is via the provided script:
+
+```bash
+bash scripts/install-tools.sh
+```
+
+This installs (or skips if already present):
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| **Terraform** | 1.5.7 (pinned) | Provision Hetzner Cloud VMs |
+| **Ansible** (ansible-core) | latest | Configure k3s cluster |
+| **kubectl** | latest stable | Interact with Kubernetes |
+| **Helm** | 3.17.2 | Package manager for K8s |
+| **ArgoCD CLI** | latest | GitOps management (optional — can use Web UI instead) |
+| **k3d** | latest | Local K8s cluster for testing |
+| **kubeseal** | latest | SealedSecrets management |
+
+The script also installs required Ansible Galaxy collections from `ansible/requirements.yml` and `kubernetes.core`.
+
+> **Note:** The script targets Ubuntu/Debian (22.04+) and requires `sudo` access for binary installation to `/usr/local/bin/`. Each tool checks if already installed and skips if present. One tool failure doesn't block others.
+
+To verify all tools are installed correctly:
+
+```bash
+bash scripts/versions.sh
+```
+
+### Manual Installation (if needed)
+
+If you prefer to install tools individually:
 
 ## 1. Clone the Repository
 
@@ -129,7 +159,9 @@ all:
 
 ### Run Playbook
 
-Install required Ansible Galaxy collections:
+> **Note:** If you used `scripts/install-tools.sh`, Ansible Galaxy collections are already installed. Skip to running the playbook.
+
+Install required Ansible Galaxy collections (if not already done):
 
 ```bash
 ansible-galaxy collection install -r requirements.yml

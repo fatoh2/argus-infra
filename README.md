@@ -24,6 +24,9 @@ Argus Infra provides a complete, reproducible Kubernetes cluster running on Hetz
 ## Quick Start
 
 ```bash
+# 0. Install required CLI tools (Terraform, Ansible, kubectl, Helm, ArgoCD, k3d, kubeseal)
+bash scripts/install-tools.sh
+
 # 1. Provision VMs
 cd terraform/environments/homelab
 cp terraform.tfvars.example terraform.tfvars
@@ -67,6 +70,8 @@ argus-infra/
 │   │   └── rbac/              # Least-privilege ServiceAccounts
 │   └── cluster-issuer/     # Let's Encrypt ClusterIssuers
 ├── scripts/                # Operational and CI scripts
+│   ├── install-tools.sh       # One-command tool installation (Terraform, Ansible, kubectl, Helm, ArgoCD, k3d, kubeseal)
+│   ├── versions.sh            # Print all tool versions for debugging
 │   ├── run-sanity-checks.sh   # Local sanity suite (Terraform, Ansible, ArgoCD)
 │   ├── argocd-health.sh       # ArgoCD app health check
 │   └── cluster-sanity.sh      # Full cluster-level sanity checks
