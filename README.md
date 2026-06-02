@@ -3,7 +3,6 @@
 [![Sanity Checks](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml)
 [![Cluster Sanity](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml)
 [![CD Deploy](https://github.com/fatoh2/argus-infra/actions/workflows/cd-deploy.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cd-deploy.yml)
-[![CD Deploy](https://github.com/fatoh2/argus-infra/actions/workflows/cd-deploy.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cd-deploy.yml)
 
 **A production-grade Kubernetes homelab platform on Hetzner Cloud** — provisioned with Terraform, configured with Ansible, and managed via GitOps with ArgoCD.
 
@@ -44,42 +43,6 @@ kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manif
 See the [full setup guide](docs/setup.md) for detailed instructions.
 
 ## Repository Structure
-## CI/CD Pipeline
-
-Argus Infra uses a two-tier CI/CD approach:
-
-1. **CI (Continuous Integration)** — runs on every PR to `develop` (Terraform validate + fmt, Ansible syntax + lint)
-2. **CD (Continuous Deployment)** — runs on every merge to `main` (validation + ArgoCD sync)
-
-See [docs/cicd.md](docs/cicd.md) for full pipeline documentation and [docs/runbooks.md](docs/runbooks.md) for operational procedures.
-
-## Key Features
-
-- **Fully GitOps-driven** — all cluster state defined in Git, ArgoCD syncs automatically
-- **Automatic TLS** — wildcard certificate via Let's Encrypt + cert-manager
-- **Observability out of the box** — Prometheus metrics, Grafana dashboards (Node Exporter Full, Kubernetes Cluster Overview), Loki logs
-- **Secure by default** — External Secrets Operator for secrets, private network for nodes
-- **Network Policies** — default-deny on all namespaces with explicit allow rules for least-privilege pod communication
-- **Pod Security Standards** — restricted profile enforced on all namespaces; workloads configured with `runAsNonRoot`, `readOnlyRootFilesystem`, and dropped capabilities
-- **Least-Privilege RBAC** — dedicated ServiceAccounts for each service with minimum required permissions; `api-service` has zero k8s API access
-- **CI/CD-validated** — Terraform validate + fmt, Ansible syntax check + lint, ShellCheck, critical file checks on every PR; CD pipeline validates and triggers ArgoCD sync on merge to main
-- **Cluster health monitoring** — scheduled cluster sanity checks (nodes, pods, ArgoCD apps, ingress) every 6 hours
-- **Local sanity suite** — run `./scripts/run-sanity-checks.sh` before committing to catch issues early
-
-## Architecture
-
-See [docs/architecture.md](docs/architecture.md) for a detailed breakdown of all components.
-
-## Prerequisites
-
-- [Hetzner Cloud](https://www.hetzner.com/cloud) account with API token
-- [Terraform](https://developer.hashicorp.com/terraform/downloads) v1.0+
-- [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/index.html) v2.10+
-- [kubectl](https://kubernetes.io/docs/tasks/tools/)
-
-## License
-
-MIT
 
 See the [CI/CD Pipeline documentation](docs/cicd.md) for details on how changes are validated and deployed.
 
@@ -114,11 +77,19 @@ argus-infra/
 │   ├── setup.md            # Setup guide
 │   └── adr/                # Architecture Decision Records
 └── .github/workflows/      # CI/CD pipeline
-    ├── sanity-checks.yml   # PR-level Terraform + Ansible validation
+    ├── sanity-checks.yml   # PR-level Terraform + Ansible validation, CD-level ArgoCD sync
     ├── cd-deploy.yml       # CD pipeline (ArgoCD sync)
     └── cluster-sanity.yml  # Cluster-level health checks (scheduled)
 ```
 
+## CI/CD Pipeline
+
+Argus Infra uses a two-tier CI/CD approach:
+
+1. **CI (Continuous Integration)** — runs on every PR to `develop` (Terraform validate + fmt, Ansible syntax + lint)
+2. **CD (Continuous Deployment)** — runs on every merge to `main` (validation + ArgoCD sync)
+
+See [docs/cicd.md](docs/cicd.md) for full pipeline documentation and [docs/runbooks.md](docs/runbooks.md) for operational procedures.
 
 ## Key Features
 
