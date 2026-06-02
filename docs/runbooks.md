@@ -269,7 +269,6 @@ Every merge to `main` triggers the CD workflow (`.github/workflows/cd-deploy.yml
 **Stage 2 — Build:** Terraform validate + plan (dry-run), Ansible syntax check, critical files check
 **Stage 3 — Deploy:** ArgoCD sync notification + optional API sync
 
-
 The deployment flow:
 1. Lint stage runs code quality checks
 2. Build stage validates infrastructure config compiles end-to-end
