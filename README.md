@@ -105,7 +105,7 @@ ssh argus@$(terraform output -raw public_ip)
 ssh argus@$(terraform output -raw public_ip) "docker --version && docker compose version"
 ```
 
-See the [GCP module documentation](docs/architecture.md#15-gcp-compute-engine-module) for full details.
+See the [GCP module documentation](docs/architecture.md#16-gcp-compute-engine-module) for full details.
 
 ### Managed Kubernetes (GCP GKE)
 
@@ -130,7 +130,7 @@ kubectl get nodes
 
 > **Tip:** The module also generates a kubeconfig file at `$(terraform output -raw kubeconfig_path)` when `generate_kubeconfig` is enabled (default: `true`).
 
-See the [GKE module documentation](docs/architecture.md#16-gcp-gke-module) for full details.
+See the [GKE module documentation](docs/architecture.md#17-gcp-gke-module) for full details.
 
 ### Single VM (AWS EC2)
 
@@ -153,7 +153,7 @@ ssh argus@$(terraform output -raw public_ip)
 ssh argus@$(terraform output -raw public_ip) "docker --version && docker compose version"
 ```
 
-See the [AWS EC2 module documentation](docs/architecture.md#17-aws-ec2-module) for full details.
+See the [AWS EC2 module documentation](docs/architecture.md#18-aws-ec2-module) for full details.
 
 ## Makefile Targets
 

@@ -81,6 +81,72 @@ bash BOOTSTRAP_WINDOWS.sh
 
 See [SETUP_WINDOWS.md](../SETUP_WINDOWS.md) for detailed Windows-specific instructions, including Docker Desktop with WSL2 backend setup.
 
+## Local Development (k3d)
+
+For local testing without cloud costs, Argus Infra supports spinning up a k3d Kubernetes cluster on your development machine. This is the fastest way to get started.
+
+### Prerequisites
+
+- **Docker** — Docker Desktop (macOS/Windows) or Docker Engine (Linux)
+- **k3d** — installed via `make install-tools`
+- **kubectl** — installed via `make install-tools`
+- **Helm** — installed via `make install-tools`
+
+### Create Local Cluster
+
+```bash
+# Install required CLI tools
+make install-tools
+
+# Spin up local k3d cluster with ArgoCD, Prometheus, and Loki
+make local-up
+```
+
+This runs `scripts/local-cluster.sh` and creates:
+- A k3d cluster named `argus-local` (1 server + 2 agents)
+- ArgoCD (GitOps) — installed via Helm with admin password `admin`
+- Prometheus + Grafana (monitoring) — kube-prometheus-stack
+- Loki + Promtail (log aggregation) — loki-stack
+
+### Access Services
+
+**ArgoCD UI:**
+```bash
+kubectl port-forward -n argocd svc/argocd-server 8080:443
+# Open: https://localhost:8080
+# User: admin | Password: admin
+```
+
+**Grafana:**
+```bash
+kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+# Open: http://localhost:3000
+# User: admin | Password: admin
+```
+
+### Tear Down
+
+```bash
+make local-down
+```
+
+This runs `scripts/local-cluster-down.sh`, which deletes the k3d cluster and removes the kubeconfig file.
+
+### Windows Setup
+
+On Windows, additional setup is required. See the [Windows Setup Guide](../SETUP_WINDOWS.md) for detailed instructions:
+
+```bash
+# Run the bootstrap script to check prerequisites (Git Bash or WSL2)
+bash BOOTSTRAP_WINDOWS.sh
+
+# Then follow the standard workflow
+make install-tools
+make local-up
+```
+
+> **Note:** Windows requires Docker Desktop with WSL2 backend for k3d clusters. Use **Git Bash** (not Command Prompt or PowerShell) for shell commands.
+
 ## 1. Clone the Repository
 
 ```bash

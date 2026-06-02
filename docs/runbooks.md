@@ -810,4 +810,4 @@ ssh argus@<public-ip> "docker --version && docker compose version"
 
 ### Module Reference
 
-See the [architecture documentation](architecture.md#17-aws-ec2-module) for the complete module reference (all variables, outputs, and configuration options). See [ADR 0006](adr/0006-aws-ec2-module.md) for the architecture decision record.
+See the [architecture documentation](architecture.md#18-aws-ec2-module) for the complete module reference (all variables, outputs, and configuration options). See [ADR 0006](adr/0006-aws-ec2-module.md) for the architecture decision record.

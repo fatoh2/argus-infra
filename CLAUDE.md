@@ -34,6 +34,8 @@ helm/base-app/      Shared chart template all apps extend
 docs/
   runbooks.md       Operational procedures — always keep updated
   adr/              Architecture Decision Records
+BOOTSTRAP_WINDOWS.sh        Windows bootstrap — checks Docker, kubectl, k3d, helm prerequisites
+SETUP_WINDOWS.md             Windows setup guide (Docker Desktop, WSL2, Chocolatey)
 scripts/
   install-tools.sh           One-command tool installation (Terraform, Ansible, kubectl, Helm, ArgoCD, k3d, kubeseal)
   versions.sh                Print all tool versions for debugging
