@@ -1,5 +1,5 @@
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
 metadata:
   name: grafana
   namespace: monitoring
@@ -7,18 +7,13 @@ metadata:
     kubernetes.io/ingress.class: traefik
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
-  rules:
-    - host: grafana.argus.local
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: grafana
-                port:
-                  number: 3000
+  entryPoints:
+    - websecure
+  routes:
+  - match: Host(`grafana.argus.local`)
+    kind: Rule
+    services:
+    - name: grafana
+      port: 80
   tls:
-    - hosts:
-        - grafana.argus.local
-      secretName: grafana-tls
+    secretName: grafana-tls
