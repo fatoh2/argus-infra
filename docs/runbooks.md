@@ -30,6 +30,24 @@ ArgoCD continuously monitors your Git repositories for Kubernetes manifest chang
 2.  **ArgoCD Sync**: ArgoCD will automatically detect the changes and sync them to the cluster. You can monitor the sync status in the ArgoCD UI.
 3.  **Manual Sync/Rollback (ArgoCD UI)**: For immediate deployments or rollbacks, you can trigger these actions directly from the ArgoCD UI.
 
+### Grafana Deployment
+Grafana is deployed via ArgoCD as a standalone application from `k8s/grafana/`.
+1.  **Modify Grafana Config**: Edit manifests in `k8s/grafana/` (dashboards, datasources, deployment settings).
+2.  **Commit and Push**: Push changes to the `develop` branch. After review, merge to `main`.
+3.  **ArgoCD Sync**: ArgoCD will automatically sync the new configuration to the cluster.
+4.  **Verify**:
+    ```bash
+    kubectl get pods -n monitoring -l app=grafana
+    kubectl get ingress -n monitoring grafana
+    ```
+5.  **Access Grafana**: Open `https://grafana.argus.local` in your browser. Default credentials: `admin`/`admin`.
+
+### Adding a New Dashboard
+1.  **Create the dashboard JSON**: Export or create a Grafana dashboard JSON.
+2.  **Add to ConfigMap**: Append the dashboard JSON to the `data` section of `k8s/grafana/configmap-dashboards.yaml` under a new key (e.g., `my-dashboard.json`).
+3.  **Register in provisioning**: If adding a new dashboard file, update `k8s/grafana/configmap-provisioning.yaml` to include it in the `providers` section.
+4.  **Commit and Sync**: Push changes and let ArgoCD sync. Grafana will pick up the new dashboard without restart.
+
 ### NetworkPolicy Deployments
 NetworkPolicies are deployed via ArgoCD as part of the `security` application.
 1.  **Modify Policies**: Edit manifests in `k8s/security/network-policies/`.
@@ -106,6 +124,16 @@ Ansible playbooks are idempotent. To rollback a configuration:
 ArgoCD allows easy rollbacks to previous application versions.
 1.  **ArgoCD UI**: In the ArgoCD UI, navigate to the application, select "History and Rollback," and choose the desired previous version to roll back to.
 2.  **Git Revert**: Alternatively, revert the Kubernetes manifest changes in your application's Git repository. ArgoCD will detect this and sync the older manifests.
+
+### Grafana Rollback
+1.  **Revert Git**: Revert the Grafana manifest changes in `k8s/grafana/`.
+2.  **ArgoCD Sync**: ArgoCD will revert Grafana to the previous state.
+3.  **Emergency Workaround**: If ArgoCD sync is broken, delete the Grafana deployment directly:
+    ```bash
+    kubectl delete deployment grafana -n monitoring
+    kubectl delete configmap grafana-dashboards grafana-datasource-config grafana-datasources -n monitoring
+    ```
+    ArgoCD will recreate them from the last synced state.
 
 ### NetworkPolicy Rollback
 1.  **Revert Git**: Revert the NetworkPolicy manifest changes in `k8s/security/network-policies/`.
@@ -291,3 +319,52 @@ Run from the repository root:
 -   **App Health**: `argocd app list` to see all applications and their health status.
 -   **Logs**: `kubectl logs -n argocd deployment/argocd-application-controller` for controller logs.
 -   **NetworkPolicy Interference**: If ArgoCD apps show `OutOfSync` or `Unknown` after applying default-deny, ArgoCD may be unable to reach resources across namespaces. See NetworkPolicy troubleshooting above.
+
+### Grafana Troubleshooting
+-   **Grafana Pod Not Starting**: Check pod logs for errors:
+    ```bash
+    kubectl logs -n monitoring deployment/grafana
+    ```
+    Common issues:
+    - **Permission denied**: Grafana's `securityContext` may need `runAsUser: 472` (Grafana's default UID) or an `emptyDir` volume for `/var/lib/grafana`.
+    - **Datasource not found**: Verify the Prometheus datasource URL in `k8s/grafana/configmap-datasources.yaml`. The service DNS must match the actual Prometheus service name.
+    - **ConfigMap not mounted**: Check that the ConfigMaps referenced in the Deployment exist:
+      ```bash
+      kubectl get configmap -n monitoring | grep grafana
+      ```
+
+-   **Grafana Not Accessible via Ingress**:
+    ```bash
+    # Check ingress status
+    kubectl get ingress -n monitoring grafana
+    # Check Traefik is routing correctly
+    kubectl get ingressroute -n monitoring
+    # Verify DNS resolves grafana.argus.local to the cluster IP
+    ```
+    If using a local cluster without DNS, add a hosts file entry:
+    ```
+    <CLUSTER_IP>  grafana.argus.local
+    ```
+
+-   **Dashboards Not Showing**:
+    ```bash
+    # Verify dashboard ConfigMap exists and has content
+    kubectl get configmap grafana-dashboards -n monitoring -o yaml | head -20
+    # Check Grafana provisioning logs
+    kubectl logs -n monitoring deployment/grafana | grep -i provisioning
+    ```
+    If dashboards are missing, ensure the provisioning ConfigMap (`grafana-datasource-config`) has the correct `dashboards` provider section pointing to the dashboard ConfigMap.
+
+-   **Default Credentials Not Working**: If `admin`/`admin` doesn't work, the password may have been changed. Reset by exec-ing into the pod:
+    ```bash
+    kubectl exec -n monitoring deployment/grafana -- grafana-cli admin reset-admin-password newpassword
+    ```
+
+-   **Grafana Shows "No data" in Panels**:
+    ```bash
+    # Verify Prometheus is reachable from Grafana
+    kubectl exec -n monitoring deployment/grafana -- wget -qO- http://prometheus-kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/query?query=up
+    # Check Prometheus targets are up
+    kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-stack-prometheus 9090:9090
+    # Then visit http://localhost:9090/targets
+    ```

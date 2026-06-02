@@ -229,7 +229,46 @@ kubectl apply -f k8s/argocd/app-of-apps.yaml
 ArgoCD will automatically detect the new application and sync it, deploying all child applications defined in `k8s/argocd/apps/`.
 
 
-### 4.3 Deploy Pod Security Standards
+### 4.3 Access Grafana
+
+After ArgoCD syncs the Grafana application, Grafana will be available at `https://grafana.argus.local`.
+
+1.  **Verify Grafana is running**:
+    ```bash
+    kubectl get pods -n monitoring -l app=grafana
+    ```
+    Wait until the pod shows `Running` and `READY 1/1`.
+
+2.  **Check the Ingress**:
+    ```bash
+    kubectl get ingress -n monitoring grafana
+    ```
+    The ingress should show the host `grafana.argus.local` with the Traefik ingress class.
+
+3.  **Access Grafana**:
+    - If DNS is configured, open `https://grafana.argus.local` in your browser.
+    - If DNS is not configured, add a hosts file entry:
+      ```
+      <CLUSTER_IP>  grafana.argus.local
+      ```
+      Where `<CLUSTER_IP>` is the IP of any cluster node (or the Traefik load balancer IP).
+
+4.  **Log in** with the default credentials:
+    - **Username:** `admin`
+    - **Password:** `admin`
+    
+    > **Security note:** Change the default password on first login. For production use, configure a secure password via Doppler and External Secrets Operator.
+
+5.  **Verify the Prometheus datasource**:
+    - Go to **Configuration > Data Sources** in the Grafana UI.
+    - The Prometheus datasource should be pre-configured and show a green "Data source is working" badge.
+
+6.  **Explore starter dashboards**:
+    - Go to **Dashboards > Browse**.
+    - You should see the provisioned dashboards (Cluster Overview, etc.).
+    - Open a dashboard and verify it shows metrics from the cluster.
+
+### 4.4 Deploy Pod Security Standards
 
 After the cluster applications are deployed, enforce Pod Security Standards (restricted profile) on all application namespaces:
 
@@ -252,7 +291,7 @@ This labels the following namespaces with `pod-security.kubernetes.io/enforce: r
 
 > **Note:** The `kube-system` and `argocd` namespaces are intentionally excluded from the restricted profile, as system-level components may require elevated privileges.
 
-### 4.4 Verify Workload Compliance
+### 4.5 Verify Workload Compliance
 
 After applying the restricted profile, verify that all existing workloads comply:
 
