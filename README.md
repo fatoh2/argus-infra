@@ -13,15 +13,6 @@ Argus Infra provides a complete, reproducible Kubernetes cluster running on Hetz
 | Layer | Tool | Purpose |
 |-------|------|---------|
 | **Infrastructure** | Terraform | Provision Hetzner VMs, GCP Compute Engine VMs, GKE clusters, AWS EC2 instances, networks, SSH keys |
-**A production-grade Kubernetes homelab platform** — provisioned with Terraform (Hetzner Cloud / GCP Compute Engine / GKE), configured with Ansible, and managed via GitOps with ArgoCD.
-
-## Overview
-
-Argus Infra provides a complete, reproducible Kubernetes cluster running on Hetzner Cloud VMs, a single VM on GCP Compute Engine, or a managed GKE cluster on Google Cloud. Everything is defined as code:
-
-| Layer | Tool | Purpose |
-|-------|------|---------|
-| **Infrastructure** | Terraform | Provision Hetzner VMs, GCP Compute Engine VMs, GKE clusters, networks, SSH keys |
 | **Configuration** | Ansible | Install k3s, configure nodes, firewall rules |
 | **GitOps** | ArgoCD | Declarative app deployment, self-healing |
 | **Ingress** | Traefik + cert-manager | HTTP routing, automatic TLS via Let's Encrypt |
@@ -150,84 +141,58 @@ The project includes a `Makefile` with common infra operations. Run `make` or `m
 | `make validate` | Terraform init (no backend) + validate | Terraform |
 | `make plan` | Terraform plan (targets module.network) | `HCLOUD_TOKEN` env var |
 | `make install-tools` | Install CLI tools (Terraform, Ansible, kubectl, etc.) | sudo access |
-| `make local-up` | Spin up local k3d cluster for testing | k3d |
-| `make local-down` | Tear down local k3d cluster | k3d |
-| `make check-versions` | Print installed tool versions | — |
-| `make sanity` | Run full local sanity check suite | Installed tools |
+| `make local-up` | Create k3d cluster with ArgoCD, Prometheus, Loki | k3d, Helm |
+| `make local-down` | Destroy k3d cluster | k3d |
+| `make check-versions` | Show installed tool versions | Installed tools |
 
 ## Repository Structure
 
-See the [CI/CD Pipeline documentation](docs/cicd.md) for details on how changes are validated and deployed.
-
 ```
 argus-infra/
-├── Makefile                 # Common infra operations (lint, validate, plan, etc.)
-├── terraform/               # Infrastructure provisioning
-│   ├── environments/homelab/       # Hetzner Cloud (k3s cluster)
-│   ├── environments/gcp-single-vm/ # GCP Compute Engine (single VM)
-│   ├── environments/gcp-gke/         # GCP GKE (managed Kubernetes cluster)
-│   ├── environments/aws-single-vm/      # AWS EC2 (single VM)
-│   ├── modules/gcp-compute-engine/   # GCP VM Terraform module
-│   ├── modules/gcp-gke/              # GCP GKE Terraform module
-│   └── modules/aws-ec2/              # AWS EC2 Terraform module
-│   ├── modules/gcp-compute-engine/   # GCP VM Terraform module
-│   └── modules/gcp-gke/              # GCP GKE Terraform module
-├── ansible/                 # k3s cluster configuration
-│   ├── inventory/
+├── ansible/                  # Ansible playbooks for k3s setup
 │   ├── playbooks/
-│   └── roles/
-├── k8s/                     # Kubernetes manifests (source of truth)
-│   ├── argocd/              # ArgoCD app-of-apps definitions
-│   │   ├── apps/            # Individual application manifests
-│   │   └── config/          # ArgoCD configuration
-│   ├── ingress/             # Traefik, cert-manager, TLS
-│   ├── monitoring/          # Prometheus stack
-│   ├── grafana/             # Grafana deployment, dashboards, datasources, ingress
-│   ├── security/            # Security policies
-│   │   ├── network-policies/   # Default deny + explicit allow rules
-│   │   ├── pod-security/       # Pod Security Standards (restricted profile)
-│   │   └── rbac/               # Least-privilege ServiceAccounts
-│   └── cluster-issuer/      # Let's Encrypt ClusterIssuers
-├── scripts/                 # Operational and CI scripts
-│   ├── install-tools.sh        # One-command tool installation (Terraform, Ansible, kubectl, Helm, ArgoCD, k3d, kubeseal)
-│   ├── versions.sh             # Print all tool versions for debugging
-│   ├── run-sanity-checks.sh    # Local sanity suite (Terraform, Ansible, ArgoCD)
-│   ├── argocd-health.sh        # ArgoCD app health check
-│   ├── local-cluster.sh        # Spin up local k3d cluster for testing
-│   ├── local-cluster-down.sh   # Tear down local k3d cluster
-│   └── cluster-sanity.sh       # Full cluster-level sanity checks
-├── docs/                    # Documentation
-│   ├── cicd.md              # CI/CD pipeline overview
-│   ├── architecture.md      # System architecture
-│   ├── runbooks.md          # Operational runbooks
-│   ├── setup.md             # Setup guide
-│   ├── adr/                 # Architecture Decision Records
-│   └── secrets.md             # Secrets management
-└── .github/workflows/       # CI/CD pipeline
-    ├── sanity-checks.yml    # PR-level Terraform + Ansible validation (CI)
-    ├── cd-deploy.yml        # CD pipeline (lint → build → deploy, path-filtered)
-    └── cluster-sanity.yml   # Cluster-level health checks (scheduled, conditionally enabled)
+│   │   └── site.yml          # Main playbook (k3s install + config)
+│   ├── roles/                # Ansible roles
+│   │   ├── k3s/              # k3s installation role
+│   │   └── common/           # Common system configuration
+│   └── inventory/            # Ansible inventories
+├── terraform/                # Terraform configurations
+│   ├── modules/              # Reusable Terraform modules
+│   │   ├── network/          # Hetzner network module
+│   │   ├── server/           # Hetzner server module
+│   │   ├── gcp-single-vm/    # GCP Compute Engine module
+│   │   ├── gcp-gke/          # GCP GKE module
+│   │   └── aws-single-vm/    # AWS EC2 module
+│   └── environments/         # Environment-specific configs
+│       ├── homelab/          # Hetzner homelab environment
+│       ├── gcp-single-vm/    # GCP single VM environment
+│       ├── gcp-gke/          # GCP GKE environment
+│       └── aws-single-vm/    # AWS EC2 environment
+├── k8s/                      # Kubernetes manifests (ArgoCD apps)
+│   ├── argocd/               # ArgoCD installation + config
+│   ├── monitoring/           # Prometheus, Grafana, Loki
+│   ├── ingress/              # Traefik, cert-manager
+│   └── system/               # System components (secrets, policies)
+├── scripts/                  # Utility scripts
+│   ├── install-tools.sh      # Automated CLI tool installation
+│   └── versions.sh           # Tool version checker
+├── docs/                     # Documentation
+│   ├── setup.md              # Full setup guide
+│   └── architecture.md       # Architecture documentation
+├── Makefile                  # Common operations
+└── README.md                 # This file
 ```
 
-## CI/CD Pipeline
+## CI/CD
 
-Argus Infra uses a three-stage CI/CD pipeline:
+The repository uses GitHub Actions for CI/CD:
 
-1. **Lint** — runs on every PR and merge to `main` (Terraform fmt, Ansible lint, ShellCheck)
-2. **Build** — runs on every PR and merge to `main` (Terraform validate + plan, Ansible syntax check, critical file checks)
-3. **Deploy** — runs only on infrastructure-relevant merges to `main` (path-filtered: `terraform/**`, `ansible/**`, `k8s/**`, `scripts/**`, `.github/workflows/cd-deploy.yml`); docs-only pushes are skipped automatically
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| **Sanity Checks** | PRs to develop/main | Terraform fmt, validate, Ansible syntax check, shellcheck |
+| **Cluster Sanity** | PRs to develop/main | k3d cluster creation, ArgoCD bootstrap, app deployment test |
+| **CD Deploy** | Push to main | Apply Terraform, run Ansible, sync ArgoCD apps |
 
-See [docs/cicd.md](docs/cicd.md) for full pipeline documentation and [docs/runbooks.md](docs/runbooks.md) for operational procedures.
+## License
 
-## Key Features
-
-- **Fully GitOps-driven** — all cluster state defined in Git, ArgoCD syncs automatically
-- **Automatic TLS** — wildcard certificate via Let's Encrypt + cert-manager
-- **Observability out of the box** — Prometheus metrics, Grafana dashboards (Node Exporter Full, Kubernetes Cluster Overview), Loki logs
-- **Secure by default** — External Secrets Operator + Doppler for secret injection, NetworkPolicies for least-privilege access, Pod Security Standards (restricted profile)
-- **Makefile-driven workflow** — `make lint`, `make validate`, `make plan`, `make install-tools`, `make local-up/down`, `make check-versions`, `make sanity`
-- **Local development** — k3d cluster for testing without cloud costs
-- **Multi-cloud support** — Hetzner Cloud (k3s cluster), GCP Compute Engine (single VM), GCP GKE (managed Kubernetes), and AWS EC2 (single VM) deployment options
-- **Multi-cloud support** — Hetzner Cloud (k3s cluster), GCP Compute Engine (single VM), and GCP GKE (managed Kubernetes) deployment options
-- **Automated CI/CD** — GitHub Actions validate every PR and deploy on merge to `main`
-- **Architecture Decision Records** — all significant decisions documented in `docs/adr/`
+MIT

@@ -45,7 +45,7 @@ resource "google_compute_instance" "this" {
   zone         = local.zone
   project      = var.project_id
 
-  tags   = var.tags
+  tags = var.tags
   labels = merge(var.labels, {
     project = "argus"
   })

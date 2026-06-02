@@ -1,7 +1,6 @@
 # Argus Infra Setup
 
 This document outlines the steps to set up the Argus Infrastructure repository — a Kubernetes homelab platform on Hetzner Cloud (k3s), GCP Compute Engine (single VM), GCP GKE (managed Kubernetes), or AWS EC2 (single VM) using Terraform, Ansible, and ArgoCD.
-This document outlines the steps to set up the Argus Infrastructure repository — a Kubernetes homelab platform on Hetzner Cloud (k3s), GCP Compute Engine (single VM), or GCP GKE (managed Kubernetes) using Terraform, Ansible, and ArgoCD.
 
 ## Prerequisites
 
@@ -195,23 +194,17 @@ cd ../terraform/environments/homelab
 terraform output control_plane_ip
 ```
 
-Then copy the kubeconfig from the server:
+SSH into the control plane node:
 
 ```bash
-# Replace <CONTROL_PLANE_IP> with the actual IP from the step above
-scp root@<CONTROL_PLANE_IP>:/etc/rancher/k3s/k3s.yaml ~/.kube/config-argus-infra
+ssh root@<CONTROL_PLANE_IP>
 ```
 
-Set the `KUBECONFIG` environment variable:
+The k3s kubeconfig is at `/etc/rancher/k3s/k3s.yaml`. Copy it to your local machine:
 
 ```bash
-export KUBECONFIG=~/.kube/config-argus-infra
-```
-
-Verify cluster access:
-
-```bash
-kubectl get nodes
+# On your local machine:
+scp root@<CONTROL_PLANE_IP>:/etc/rancher/k3s/k3s.yaml ~/.kube/config
 ```
 
 ### Install ArgoCD
@@ -221,297 +214,197 @@ kubectl create namespace argocd
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 ```
 
-Wait for all ArgoCD pods to be ready:
+### Access the ArgoCD Web UI
+
+By default, the ArgoCD API server is not exposed externally. To access it:
 
 ```bash
-kubectl -n argocd wait --for=condition=ready pod --all --timeout=300s
+kubectl port-forward svc/argocd-server -n argocd 8080:443
 ```
 
-### Access the ArgoCD UI
+Then open https://localhost:8080 in your browser.
 
-By default, the ArgoCD API server is exposed via a `ClusterIP` service. To access the UI, you can port-forward:
-
-```bash
-kubectl port-forward -n argocd service/argocd-server 8080:443
-```
-
-Then open `https://localhost:8080` in your browser.
-
-The default username is `admin`. Retrieve the initial password:
+The default username is `admin`. Get the initial password:
 
 ```bash
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 ```
 
-### Configure ArgoCD with Git Repository
+### Deploy Applications via ArgoCD
 
-1. Log in to the ArgoCD UI or CLI
-2. Add your Git repository:
-   ```bash
-   argocd repo add git@github.com:fatoh2/argus-infra.git --ssh-private-key-path ~/.ssh/argus_homelab
-   ```
-3. Create the root application:
-   ```bash
-   argocd app create argocd-root \
-     --repo git@github.com:fatoh2/argus-infra.git \
-     --path k8s/argocd \
-     --dest-server https://kubernetes.default.svc \
-     --dest-namespace argocd \
-     --sync-policy automated
-   ```
-
-ArgoCD will now sync all applications defined in `k8s/argocd/apps/` to the cluster.
-
-## 5. Verify the Cluster
-
-### Check Node Status
+The repository includes ArgoCD Application manifests in the `k8s/argocd/` directory. To deploy monitoring:
 
 ```bash
-kubectl get nodes
+kubectl apply -f k8s/argocd/monitoring.yaml
 ```
 
-All nodes should show `Ready`.
+This will deploy Prometheus, Grafana, and Loki to your cluster via ArgoCD.
 
-### Check System Pods
-
-```bash
-kubectl get pods -A
-```
-
-### Run Local Sanity Checks
-
-```bash
-make sanity
-```
-
-Or directly:
-
-```bash
-bash scripts/run-sanity-checks.sh
-```
-
-## Next Steps
-
-- Review the [Architecture](docs/architecture.md) document for a deep dive into component design
-- Check the [CI/CD Pipeline](docs/cicd.md) for how changes are validated and deployed
-- See the [Runbooks](docs/runbooks.md) for operational procedures
-- Browse [Architecture Decision Records](docs/adr/) for design rationale
-
-
-## 6. Alternative: GCP Compute Engine (Single VM)
-
-For lightweight deployments, testing, or running Argus components that don't require a full Kubernetes cluster, you can deploy a single VM on Google Cloud Platform instead of provisioning a Hetzner k3s cluster.
+## GCP Compute Engine (Single VM)
 
 ### Prerequisites
 
-- **Google Cloud Platform account** — with billing enabled
-- **GCP project** — create one at [console.cloud.google.com](https://console.cloud.google.com)
-- **SSH key pair** — for accessing the VM
-- **CLI tools** — `make install-tools` installs Terraform (the GCP provider is downloaded automatically)
+- Google Cloud Platform account with billing enabled
+- GCP project created
+- Service account with `compute.admin` role (or use `gcloud auth application-default login`)
 
-### Provision the VM
+### Configure Variables
 
 ```bash
 cd terraform/environments/gcp-single-vm
-
-# Copy and edit the example vars
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-Edit `terraform.tfvars` with your GCP project ID and SSH public key:
+Edit `terraform.tfvars`:
 
 ```hcl
-project_id      = "my-gcp-project"       # Required: your GCP project ID
-ssh_public_key  = "ssh-rsa AAA..."        # Required: your public SSH key
-region          = "us-central1"           # Optional: GCP region
-machine_type    = "e2-standard-4"         # Optional: VM size
-boot_disk_size  = 100                     # Optional: disk size in GB
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+zone       = "us-central1-a"
+ssh_public_key = "ssh-ed25519 AAAAC3... your@email.com"
 ```
 
-Initialize and apply:
+### Provision
 
 ```bash
 terraform init
-terraform plan
 terraform apply
 ```
 
-### Connect to the VM
+### Connect
 
 ```bash
-# Using the SSH key configured in terraform.tfvars
 ssh argus@$(terraform output -raw public_ip)
-
-# Or using gcloud (if you have the Google Cloud SDK installed)
-gcloud compute ssh argus-vm --zone=us-central1-a --project=<project-id>
 ```
 
-### Verify Docker
-
-After the VM boots (wait ~2 minutes), verify Docker and Docker Compose are installed:
-
-```bash
-ssh argus@$(terraform output -raw public_ip) "docker --version && docker compose version"
-```
-
-### Destroy the VM
-
-```bash
-cd terraform/environments/gcp-single-vm
-terraform destroy
-```
-
-> **Warning:** `terraform destroy` will delete the VM, boot disk, and firewall rules. Data on the boot disk is lost unless a snapshot was taken.
-
-### Full Reference
-
-See the [architecture documentation](architecture.md#15-gcp-compute-engine-module) for the complete module reference (all variables, outputs, and configuration options). See the [runbooks](runbooks.md#gcp-vm-deployment) for operational procedures.
-
-## 7. Alternative: GCP GKE (Managed Kubernetes)
-
-For a fully managed Kubernetes cluster on Google Cloud Platform, Argus Infra includes a Terraform module for deploying a GKE cluster with Autopilot mode. This eliminates the need to manage control plane nodes or worker VMs.
+## GCP GKE (Managed Kubernetes)
 
 ### Prerequisites
 
-- **Google Cloud Platform account** — with billing enabled
-- **GCP project** — create one at [console.cloud.google.com](https://console.cloud.google.com)
-- **Google Cloud SDK (`gcloud`)** — for authenticating with GCP and configuring kubectl
-- **CLI tools** — `make install-tools` installs Terraform (the GCP provider is downloaded automatically)
+- Google Cloud Platform account with billing enabled
+- GCP project with Kubernetes Engine API enabled
+- Service account with `container.admin` and `compute.admin` roles
 
-### Provision the GKE Cluster
+### Configure Variables
 
 ```bash
 cd terraform/environments/gcp-gke
-
-# Copy and edit the example vars
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-Edit `terraform.tfvars` with your GCP project ID:
+Edit `terraform.tfvars`:
 
 ```hcl
-project_id = "my-gcp-project"       # Required: your GCP project ID
-# region           = "us-central1"  # Optional: GCP region
-# cluster_name     = "argus-cluster" # Optional: cluster name
-# enable_autopilot = true           # Optional: Autopilot mode (default: true)
-# release_channel  = "REGULAR"      # Optional: GKE release channel
+project_id = "your-gcp-project-id"
+region     = "us-central1"
 ```
 
-Initialize and apply:
+### Provision
 
 ```bash
 terraform init
-terraform plan
 terraform apply
 ```
 
 ### Configure kubectl
 
-After the cluster is created, configure kubectl to point to your new GKE cluster:
-
 ```bash
-# Using the output command
-$(terraform output -raw kubectl_configure_command)
-
-# Or manually using gcloud
-gcloud container clusters get-credentials argus-cluster --region us-central1 --project my-gcp-project
-```
-
-### Verify the Cluster
-
-```bash
+gcloud container clusters get-credentials $(terraform output -raw cluster_name) --region=us-central1
 kubectl get nodes
-# All nodes should show Ready state
-kubectl get pods -A
-# CoreDNS and other system pods should be running
 ```
 
-### Default Helm Repos
+## AWS EC2 (Single VM)
 
-The GKE module automatically adds the following Helm repositories after cluster creation:
+### Prerequisites
 
-| Name | URL |
-|------|-----|
-| argo | `https://argoproj.github.io/argo-helm` |
-| traefik | `https://traefik.github.io/charts` |
-| prometheus-community | `https://prometheus-community.github.io/helm-charts` |
-| grafana | `https://grafana.github.io/helm-charts` |
-| jetstack | `https://charts.jetstack.io` |
-| external-secrets | `https://charts.external-secrets.io` |
+- AWS account with billing enabled
+- AWS CLI configured with credentials (`aws configure`)
+- EC2 key pair created in your chosen region
 
-### Destroy the Cluster
+### Configure Variables
+
+```bash
+cd terraform/environments/aws-single-vm
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Edit `terraform.tfvars`:
+
+```hcl
+aws_region      = "us-east-1"
+key_name        = "your-ec2-key-pair-name"
+ssh_public_key  = "ssh-ed25519 AAAAC3... your@email.com"
+```
+
+### Provision
+
+```bash
+terraform init
+terraform apply
+```
+
+### Connect
+
+```bash
+ssh argus@$(terraform output -raw public_ip)
+```
+
+## Troubleshooting
+
+### Terraform
+
+- **"Error: No valid credential sources found"** — Ensure your cloud provider credentials are configured correctly.
+- **"Error: Quota exceeded"** — Request a quota increase in your cloud provider console.
+
+### Ansible
+
+- **"Permission denied (publickey)"** — Verify the SSH key path in your inventory file and ensure the key is added to your SSH agent.
+- **"Timeout when waiting for k3s"** — Check that the VM has outbound internet access and sufficient resources.
+
+### ArgoCD
+
+- **"Connection refused"** — Ensure the ArgoCD server pod is running: `kubectl get pods -n argocd`
+- **"Invalid username or password"** — Reset the admin password: `argocd account update-password`
+
+### GKE
+
+- **"Error 403: Required 'container.clusters.get' permission"** — Ensure your service account has the `container.admin` role.
+- **"Cluster is in 'ERROR' state"** — Check the GCP Console for specific error details. Common causes include insufficient quota or misconfigured networking.
+
+## Cleanup
+
+To avoid ongoing charges, destroy resources when not in use:
+
+### Hetzner
+
+```bash
+cd terraform/environments/homelab
+terraform destroy
+```
+
+### GCP Compute Engine
+
+```bash
+cd terraform/environments/gcp-single-vm
+terraform destroy
+```
+
+### GCP GKE
 
 ```bash
 cd terraform/environments/gcp-gke
 terraform destroy
 ```
 
-> **Warning:** `terraform destroy` will delete the GKE cluster and all associated resources (nodes, disks, load balancers). Persistent volumes and their data will be lost unless backed up.
-
-### Full Reference
-
-See the [architecture documentation](architecture.md#16-gcp-gke-module) for the complete module reference (all variables, outputs, and configuration options). See the [runbooks](runbooks.md#gcp-gke-deployment) for operational procedures.
-## 8. Alternative: AWS EC2 (Single VM)
-
-For lightweight deployments, testing, or running Argus components on Amazon Web Services, you can deploy a single EC2 instance instead of provisioning a Hetzner k3s cluster or GCP VM.
-
-### Prerequisites
-
-- **AWS account** — with billing enabled
-- **AWS credentials** — configured via environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) or `~/.aws/credentials`
-- **SSH key pair** — for accessing the EC2 instance
-- **CLI tools** — `make install-tools` installs Terraform (the AWS provider is downloaded automatically)
-
-### Provision the EC2 Instance
-
-```bash
-cd terraform/environments/aws-single-vm
-
-# Copy and edit the example vars
-cp terraform.tfvars.example terraform.tfvars
-```
-
-Edit `terraform.tfvars` with your SSH public key and desired configuration:
-
-```hcl
-ssh_public_key  = "ssh-rsa AAA..."        # Required: your public SSH key
-region          = "us-east-1"             # Optional: AWS region
-instance_type   = "t3.xlarge"             # Optional: EC2 instance type
-root_volume_size = 100                    # Optional: root volume size in GB
-```
-
-Initialize and apply:
-
-```bash
-terraform init
-terraform plan
-terraform apply
-```
-
-### Connect to the EC2 Instance
-
-```bash
-# Using the SSH key configured in terraform.tfvars
-ssh argus@$(terraform output -raw public_ip)
-```
-
-### Verify Docker
-
-After the instance boots (wait ~2 minutes), verify Docker and Docker Compose are installed:
-
-```bash
-ssh argus@$(terraform output -raw public_ip) "docker --version && docker compose version"
-```
-
-### Destroy the EC2 Instance
+### AWS EC2
 
 ```bash
 cd terraform/environments/aws-single-vm
 terraform destroy
 ```
 
-> **Warning:** `terraform destroy` will delete the EC2 instance, VPC, subnet, security group, and Elastic IP. Data on the root volume is lost unless an AMI or snapshot was created.
+### Local k3d
 
-### Full Reference
-
-See the [architecture documentation](architecture.md#17-aws-ec2-module) for the complete module reference (all variables, outputs, and configuration options). See the [runbooks](runbooks.md#aws-ec2-deployment) for operational procedures.
+```bash
+make local-down
+```

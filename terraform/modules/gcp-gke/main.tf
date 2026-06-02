@@ -1,3 +1,6 @@
+# ---------------------------------------------------------------------------
+# Terraform configuration
+# ---------------------------------------------------------------------------
 terraform {
   required_version = ">= 1.5"
 
@@ -21,7 +24,16 @@ terraform {
 # Locals
 # ---------------------------------------------------------------------------
 locals {
-  network_name = var.network != null ? var.network : "default"
+  # Default location: use zone if provided, otherwise use region
+  location = var.zone != null ? var.zone : var.region
+
+  # Master authorized networks: default to empty if not specified
+  master_authorized_networks = var.master_authorized_cidrs != null ? [
+    for cidr in var.master_authorized_cidrs : {
+      cidr_block   = cidr
+      display_name = "allow-${replace(cidr, "/", "-")}"
+    }
+  ] : []
 }
 
 # ---------------------------------------------------------------------------
@@ -30,18 +42,18 @@ locals {
 data "google_client_config" "default" {}
 
 # ---------------------------------------------------------------------------
-# GKE Cluster (Autopilot by default)
+# GKE Cluster
 # ---------------------------------------------------------------------------
 resource "google_container_cluster" "this" {
-  name     = var.cluster_name
-  location = var.region
+  name     = var.name
+  location = local.location
   project  = var.project_id
 
-  # Autopilot mode
+  # Autopilot mode toggle
   enable_autopilot = var.enable_autopilot
 
   # Network configuration
-  network    = local.network_name
+  network    = var.network
   subnetwork = var.subnetwork
 
   # Release channel
@@ -49,100 +61,189 @@ resource "google_container_cluster" "this" {
     channel = var.release_channel
   }
 
+  # Cluster resource labels
+  resource_labels = merge(var.labels, {
+    project = "argus"
+  })
+
+  # Allow GKE to manage the cluster
+  deletion_protection = var.deletion_protection
+
+  # -----------------------------------------------------------------------
+  # Standard-mode only settings (ignored when enable_autopilot = true)
+  # -----------------------------------------------------------------------
+
+  # We're creating a node pool separately, so remove the default one
+  remove_default_node_pool = var.enable_autopilot ? null : true
+  initial_node_count       = var.enable_autopilot ? null : 1
+
   # Private cluster configuration
   dynamic "private_cluster_config" {
-    for_each = var.enable_private_nodes || var.enable_private_endpoint ? [1] : []
+    for_each = var.enable_autopilot ? [] : [1]
     content {
-      enable_private_endpoint = var.enable_private_endpoint
       enable_private_nodes    = var.enable_private_nodes
+      enable_private_endpoint = var.enable_private_endpoint
       master_ipv4_cidr_block  = var.master_ipv4_cidr_block
     }
   }
 
-  # Deletion protection
-  deletion_protection = var.deletion_protection
-
-  # Labels
-  labels = merge(var.labels, {
-    cluster_name = var.cluster_name
-  })
-
-  # Node pool configuration for Standard mode (ignored by Autopilot)
-  dynamic "node_pool" {
+  # Master auth: allow public access with authorized networks
+  dynamic "master_authorized_networks_config" {
     for_each = var.enable_autopilot ? [] : [1]
     content {
-      name = "default-node-pool"
-
-      initial_node_count = var.num_nodes
-
-      node_config {
-        machine_type = var.node_machine_type
-        disk_size_gb = 100
-        disk_type    = "pd-standard"
-
-        labels = {
-          project = "argus"
+      dynamic "cidr_blocks" {
+        for_each = local.master_authorized_networks
+        content {
+          cidr_block   = cidr_blocks.value.cidr_block
+          display_name = cidr_blocks.value.display_name
         }
-
-        service_account = var.service_account_email != null ? var.service_account_email : null
-
-        oauth_scopes = [
-          "https://www.googleapis.com/auth/cloud-platform",
-        ]
       }
+    }
+  }
 
-      management {
-        auto_repair  = true
-        auto_upgrade = true
+  # IP allocation policy for VPC-native cluster
+  dynamic "ip_allocation_policy" {
+    for_each = var.enable_vpc_native && !var.enable_autopilot ? [1] : []
+    content {
+      cluster_secondary_range_name  = var.cluster_secondary_range_name
+      services_secondary_range_name = var.services_secondary_range_name
+    }
+  }
+
+  # Maintenance window
+  dynamic "maintenance_policy" {
+    for_each = var.enable_autopilot ? [] : [1]
+    content {
+      daily_maintenance_window {
+        start_time = var.maintenance_window_start
       }
+    }
+  }
+
+  # Addons
+  dynamic "addons_config" {
+    for_each = var.enable_autopilot ? [] : [1]
+    content {
+      http_load_balancing {
+        disabled = !var.enable_http_load_balancing
+      }
+      horizontal_pod_autoscaling {
+        disabled = !var.enable_horizontal_pod_autoscaling
+      }
+      network_policy_config {
+        disabled = !var.enable_network_policy
+      }
+    }
+  }
+
+  # Network policy
+  dynamic "network_policy" {
+    for_each = var.enable_network_policy && !var.enable_autopilot ? [1] : []
+    content {
+      enabled  = true
+      provider = "CALICO"
+    }
+  }
+
+  # Workload identity
+  dynamic "workload_identity_config" {
+    for_each = var.enable_workload_identity && !var.enable_autopilot ? [1] : []
+    content {
+      workload_pool = "${var.project_id}.svc.id.goog"
+    }
+  }
+
+  # Vertical pod autoscaling
+  dynamic "vertical_pod_autoscaling" {
+    for_each = var.enable_autopilot ? [] : [1]
+    content {
+      enabled = var.enable_vpa
+    }
+  }
+
+  # Cluster autoscaling
+  dynamic "cluster_autoscaling" {
+    for_each = var.enable_autopilot ? [] : [1]
+    content {
+      enabled = var.enable_cluster_autoscaling
     }
   }
 }
 
 # ---------------------------------------------------------------------------
-# kubeconfig (for kubectl usage)
+# Node Pool (Standard mode only)
 # ---------------------------------------------------------------------------
-resource "local_file" "kubeconfig" {
-  content = templatefile("${path.module}/templates/kubeconfig.tftpl", {
-    cluster_name     = google_container_cluster.this.name
-    cluster_endpoint = google_container_cluster.this.endpoint
-    cluster_ca       = google_container_cluster.this.master_auth[0].cluster_ca_certificate
-    access_token     = data.google_client_config.default.access_token
-    project_id       = var.project_id
-    region           = var.region
-  })
-  filename = pathexpand("~/.kube/config-${var.cluster_name}")
+resource "google_container_node_pool" "primary" {
+  count = var.enable_autopilot ? 0 : 1
 
-  file_permission = "0600"
+  name     = "${var.name}-primary-pool"
+  location = local.location
+  project  = var.project_id
+  cluster  = google_container_cluster.this.name
+
+  initial_node_count = var.initial_node_count
+
+  autoscaling {
+    min_node_count = var.min_node_count
+    max_node_count = var.max_node_count
+  }
+
+  management {
+    auto_repair  = true
+    auto_upgrade = true
+  }
+
+  node_config {
+    machine_type = var.machine_type
+    disk_size_gb = var.disk_size_gb
+    disk_type    = var.disk_type
+    image_type   = var.image_type
+
+    oauth_scopes = var.oauth_scopes
+
+    labels = merge(var.node_labels, {
+      project = "argus"
+      pool    = "primary"
+    })
+
+    tags = var.node_tags
+
+    # Service account
+    service_account = var.node_service_account_email
+
+    # Shielded instance config
+    shielded_instance_config {
+      enable_secure_boot          = var.enable_secure_boot
+      enable_integrity_monitoring = true
+    }
+
+    # Workload metadata config
+    workload_metadata_config {
+      mode = var.enable_workload_identity ? "GKE_METADATA" : "GCE_METADATA"
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [
+      initial_node_count,
+    ]
+  }
 }
 
 # ---------------------------------------------------------------------------
-# Helm Repository Setup (via local-exec after cluster is ready)
+# Kubeconfig generation (local file)
 # ---------------------------------------------------------------------------
-resource "null_resource" "helm_repos" {
-  depends_on = [google_container_cluster.this]
+resource "local_file" "kubeconfig" {
+  count = var.generate_kubeconfig ? 1 : 0
 
-  # Trigger re-run if cluster endpoint changes or helm_repos changes
-  triggers = {
-    cluster_endpoint = google_container_cluster.this.endpoint
-    helm_repos_hash  = md5(jsonencode(var.helm_repos))
-  }
+  filename = var.kubeconfig_path != null ? var.kubeconfig_path : pathexpand("~/.kube/config-${var.name}")
 
-  # Configure kubectl first, then add Helm repos
-  provisioner "local-exec" {
-    command = <<-EOT
-      set -e
-      echo "=== Configuring kubectl for ${var.cluster_name} ==="
-      gcloud container clusters get-credentials ${var.cluster_name} \
-        --region ${var.region} \
-        --project ${var.project_id} 2>/dev/null || \
-        echo "WARNING: gcloud not available. Use the kubeconfig at ~/.kube/config-${var.cluster_name}"
-
-      echo "=== Adding Helm repositories ==="
-      ${indent(6, join("\n", [for name, url in var.helm_repos : "helm repo add ${name} ${url} 2>/dev/null || echo 'Repo ${name} already exists'"]))}
-
-      helm repo update 2>/dev/null || true
-      echo "=== Helm repositories configured ==="
-    EOT
-  }
+  content = templatefile("${path.module}/templates/kubeconfig.tftpl", {
+    cluster_name       = google_container_cluster.this.name
+    cluster_endpoint   = google_container_cluster.this.endpoint
+    cluster_ca         = google_container_cluster.this.master_auth[0].cluster_ca_certificate
+    project_id         = var.project_id
+    location           = local.location
+    access_token       = data.google_client_config.default.access_token
+  })
 }
