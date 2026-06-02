@@ -266,3 +266,85 @@ See [docs/runbooks.md](runbooks.md) for detailed restore procedures, including:
 - **Cluster Autoscaling:** Implement cluster autoscaler to automatically add/remove worker nodes based on resource utilization.
 - **Service Mesh:** Evaluate Istio or Linkerd for advanced traffic management, observability, and security features.
 - **Disaster Recovery:** Implement cross-region backup and recovery for the entire cluster state.
+
+## 15. GCP Compute Engine Module
+
+Argus Infra includes a Terraform module for deploying a single VM on Google Cloud Platform (GCP). This is useful for lightweight deployments, testing, or running Argus components that don't require a full Kubernetes cluster.
+
+### Module: `modules/gcp-compute-engine/`
+
+**Purpose:** Provision a single Compute Engine VM with Docker pre-installed, firewall rules for SSH/HTTP/HTTPS, and optional public IP.
+
+**Key Variables:**
+- `project_id` (required) — GCP project ID
+- `name` — VM name (default: `argus-vm`)
+- `region` / `zone` — Deployment location
+- `machine_type` — GCP machine type (default: `e2-standard-4`)
+- `boot_disk_size` — Boot disk size in GB (default: 100)
+- `enable_public_ip` — Whether to assign an ephemeral external IP
+- `ssh_public_key` — Public SSH key for VM access
+- `create_firewall_rules` — Whether to create SSH/HTTP/HTTPS firewall rules
+
+**Outputs:** Instance ID, name, self-link, internal/external IPs, SSH command, firewall rule names.
+
+**Usage:**
+```hcl
+module "argus_vm" {
+  source = "../../modules/gcp-compute-engine"
+
+  project_id     = var.project_id
+  name           = "argus-vm"
+  region         = var.region
+  machine_type   = "e2-standard-4"
+  ssh_public_key = var.ssh_public_key
+}
+```
+
+## 16. GCP GKE Module
+
+Argus Infra includes a Terraform module for deploying a Google Kubernetes Engine (GKE) cluster on GCP. This enables running Argus on a managed Kubernetes service with Autopilot mode for reduced operational overhead.
+
+### Module: `modules/gcp-gke/`
+
+**Purpose:** Provision a GKE cluster (Autopilot by default) with kubectl configured and Helm repositories pre-added.
+
+**Key Variables:**
+- `project_id` (required) — GCP project ID
+- `region` — GCP region (default: `us-central1`)
+- `cluster_name` — GKE cluster name (default: `argus-cluster`)
+- `num_nodes` — Node count for Standard mode (default: 3; ignored by Autopilot)
+- `node_machine_type` — Machine type for Standard mode (default: `e2-standard-4`; ignored by Autopilot)
+- `enable_autopilot` — Enable Autopilot mode (default: `true`)
+- `release_channel` — GKE release channel (default: `REGULAR`)
+- `network` / `subnetwork` — VPC configuration
+- `enable_private_endpoint` / `enable_private_nodes` — Private cluster settings
+- `deletion_protection` — Prevent accidental cluster deletion
+- `helm_repos` — Map of Helm repositories to add after cluster creation
+
+**Outputs:** Cluster ID, name, endpoint, CA certificate, kubeconfig path, kubectl configure command, list of Helm repos added.
+
+**Default Helm Repos Added:**
+| Name | URL |
+|------|-----|
+| argo | `https://argoproj.github.io/argo-helm` |
+| traefik | `https://traefik.github.io/charts` |
+| prometheus-community | `https://prometheus-community.github.io/helm-charts` |
+| grafana | `https://grafana.github.io/helm-charts` |
+| jetstack | `https://charts.jetstack.io` |
+| external-secrets | `https://charts.external-secrets.io` |
+
+**Usage:**
+```hcl
+module "argus_gke" {
+  source = "../../modules/gcp-gke"
+
+  project_id = var.project_id
+  region     = var.region
+
+  cluster_name      = "argus-cluster"
+  enable_autopilot  = true
+  release_channel   = "REGULAR"
+}
+```
+
+**Done when:** `kubectl get nodes` shows all nodes in Ready state.
