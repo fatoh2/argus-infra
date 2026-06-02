@@ -148,4 +148,4 @@ jobs:
           curl -sS -X POST \
             "https://${ARGOCD_SERVER}/api/v1/applications/argocd-root/sync" \
             -H "Authorization: Bearer ${ARGOCD_TOKEN}" \
-            -d '{}'
+            -d '{"prune": true, "dryRun": false, "strategy": {"hook": {}}}' || echo "::warning::ArgoCD sync API call failed. ArgoCD will eventually sync on its own polling interval."
