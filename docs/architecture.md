@@ -133,36 +133,13 @@ Grafana is deployed as a standalone ArgoCD application (separate from the `monit
 | Resource | File | Purpose |
 |----------|------|---------|
 | ArgoCD Application | `k8s/argocd/apps/grafana.yaml` | Declares the Grafana app for ArgoCD GitOps |
-| Deployment | `k8s/grafana/deployment.yaml` | Single replica running `grafana/grafana:latest` on port 3000 |
-| Service | `k8s/grafana/service.yaml` | ClusterIP service exposing port 80 → 3000 |
-| Ingress | `k8s/grafana/ingress.yaml` | Traefik ingress at `grafana.argus.local` with TLS |
-| Datasource ConfigMap | `k8s/grafana/configmap-datasources.yaml` | Pre-configures Prometheus datasource |
-| Provisioning ConfigMap | `k8s/grafana/configmap-provisioning.yaml` | Dashboard provisioning configuration |
-| Dashboard ConfigMap | `k8s/grafana/configmap-dashboards.yaml` | Starter dashboards (cluster overview, nodes, pods) |
-
-**Datasource:** Grafana is pre-configured with a Prometheus datasource pointing to the kube-prometheus-stack Prometheus service at `http://prometheus-kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090`.
-
-**Dashboards:** Two starter dashboards are provisioned via ConfigMap:
-- **Cluster Overview** — CPU usage by pod, memory usage by pod, and node-level resource utilization.
-- Additional dashboards can be added by extending the `configmap-dashboards.yaml` ConfigMap.
-
-**Ingress:** Grafana is accessible at `https://grafana.argus.local` via Traefik ingress with automatic TLS from cert-manager. Default credentials are `admin`/`admin` (change on first login).
-
-**Storage:** Grafana uses an `emptyDir` volume for `/var/lib/grafana`. This means dashboards and settings are lost on pod restart if not provisioned via ConfigMaps. For persistent storage, replace with a PVC backed by Longhorn or similar.
-
-
-### Grafana Deployment Details
-
-Grafana is deployed as a standalone ArgoCD application (separate from the `monitoring` app that manages kube-prometheus-stack). The deployment consists of:
-
-| Resource | File | Purpose |
-|----------|------|---------|
-| ArgoCD Application | `k8s/argocd/apps/grafana.yaml` | Declares the Grafana app for ArgoCD GitOps |
-| Deployment | `k8s/grafana/deployment.yaml` | Single replica running `grafana/grafana:latest` on port 3000 |
+| Deployment | `k8s/grafana/deployment.yaml` | Single replica running `grafana/grafana:11.0.0` on port 3000 |
 | Service | `k8s/grafana/service.yaml` | ClusterIP service exposing port 80 → 3000 |
 | Ingress | `k8s/grafana/ingress.yaml` | Traefik ingress at `grafana.argus.local` with TLS via cert-manager |
-| Datasource ConfigMap | `k8s/grafana/configmap-datasources.yaml` | Pre-configures Prometheus datasource |
+| Datasource ConfigMap | `k8s/grafana/configmap-provisioning.yaml` | Pre-configures Prometheus datasource |
 | Dashboard ConfigMap | `k8s/grafana/configmap-dashboards.yaml` | Provisioned dashboards (Node Exporter Full, Kubernetes Cluster Overview) |
+| PVC | `k8s/grafana/pvc.yaml` | 5Gi persistent storage for Grafana data |
+| Secret Template | `k8s/grafana/secret-template.yaml` | Admin credentials template (managed via ESO in production) |
 
 **Datasource:** Grafana is pre-configured with a Prometheus datasource pointing to the kube-prometheus-stack Prometheus service at `http://prometheus-kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090`.
 
@@ -172,10 +149,11 @@ Grafana is deployed as a standalone ArgoCD application (separate from the `monit
 
 Additional dashboards can be added by extending the `configmap-dashboards.yaml` ConfigMap.
 
-**Ingress:** Grafana is accessible at `https://grafana.argus.local` via Traefik ingress with automatic TLS from cert-manager (Let's Encrypt). Default credentials are `admin`/`admin` (change on first login).
+**Ingress:** Grafana is accessible at `https://grafana.argus.local` via Traefik ingress with automatic TLS from cert-manager (Let's Encrypt).
 
-**Storage:** Grafana uses an `emptyDir` volume for `/var/lib/grafana`. This means dashboards and settings are lost on pod restart if not provisioned via ConfigMaps. For persistent storage, replace with a PVC backed by Longhorn or similar.
+**Credentials:** Admin credentials are injected via the `grafana-admin-credentials` Kubernetes Secret (managed by External Secrets Operator in production). The secret provides `GF_SECURITY_ADMIN_USER` and `GF_SECURITY_ADMIN_PASSWORD` environment variables to the Grafana pod. See `k8s/grafana/secret-template.yaml` for the expected secret shape.
 
+**Storage:** Grafana uses a 5Gi PersistentVolumeClaim (`k8s/grafana/pvc.yaml`) mounted at `/var/lib/grafana` for persistent storage of dashboards, settings, and user data.
 
 ## 9. Security (Kubernetes NetworkPolicies)
 

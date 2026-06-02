@@ -263,9 +263,9 @@ After ArgoCD syncs the Grafana application, Grafana will be available at `https:
     - Go to **Configuration > Data Sources** in the Grafana UI.
     - The Prometheus datasource should be pre-configured and show a green "Data source is working" badge.
 
-6.  **Explore starter dashboards**:
+6.  **Explore provisioned dashboards**:
     - Go to **Dashboards > Browse**.
-    - You should see the provisioned dashboards (Cluster Overview, etc.).
+    - You should see two provisioned dashboards: **Node Exporter Full** and **Kubernetes Cluster Overview**.
     - Open a dashboard and verify it shows metrics from the cluster.
 
 ### 4.4 Deploy Pod Security Standards
