@@ -267,7 +267,7 @@ See [docs/runbooks.md](runbooks.md) for detailed restore procedures, including:
 - **Service Mesh:** Evaluate Istio or Linkerd for advanced traffic management, observability, and security features.
 - **Disaster Recovery:** Implement cross-region backup and recovery for the entire cluster state.
 
-## 9. GCP Compute Engine Module
+## 15. GCP Compute Engine Module
 
 Argus Infra includes a Terraform module for deploying a single VM on Google Cloud Platform (GCP). This is useful for lightweight deployments, testing, or running Argus components that don't require a full Kubernetes cluster.
 
@@ -357,3 +357,52 @@ terraform apply
 # Connect
 ssh argus@$(terraform output -raw public_ip)
 ```
+
+## 16. GCP GKE Module
+
+Argus Infra includes a Terraform module for deploying a Google Kubernetes Engine (GKE) cluster on GCP. This enables running Argus on a managed Kubernetes service with Autopilot mode for reduced operational overhead.
+
+### Module: `modules/gcp-gke/`
+
+**Purpose:** Provision a GKE cluster (Autopilot by default) with kubectl configured and Helm repositories pre-added.
+
+**Key Variables:**
+- `project_id` (required) — GCP project ID
+- `region` — GCP region (default: `us-central1`)
+- `cluster_name` — GKE cluster name (default: `argus-cluster`)
+- `num_nodes` — Node count for Standard mode (default: 3; ignored by Autopilot)
+- `node_machine_type` — Machine type for Standard mode (default: `e2-standard-4`; ignored by Autopilot)
+- `enable_autopilot` — Enable Autopilot mode (default: `true`)
+- `release_channel` — GKE release channel (default: `REGULAR`)
+- `network` / `subnetwork` — VPC configuration
+- `enable_private_endpoint` / `enable_private_nodes` — Private cluster settings
+- `deletion_protection` — Prevent accidental cluster deletion
+- `helm_repos` — Map of Helm repositories to add after cluster creation
+
+**Outputs:** Cluster ID, name, endpoint, CA certificate, kubeconfig path, kubectl configure command, list of Helm repos added.
+
+**Default Helm Repos Added:**
+| Name | URL |
+|------|-----|
+| argo | `https://argoproj.github.io/argo-helm` |
+| traefik | `https://traefik.github.io/charts` |
+| prometheus-community | `https://prometheus-community.github.io/helm-charts` |
+| grafana | `https://grafana.github.io/helm-charts` |
+| jetstack | `https://charts.jetstack.io` |
+| external-secrets | `https://charts.external-secrets.io` |
+
+**Usage:**
+```hcl
+module "argus_gke" {
+  source = "../../modules/gcp-gke"
+
+  project_id = var.project_id
+  region     = var.region
+
+  cluster_name      = "argus-cluster"
+  enable_autopilot  = true
+  release_channel   = "REGULAR"
+}
+```
+
+**Done when:** `kubectl get nodes` shows all nodes in Ready state.
