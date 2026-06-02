@@ -17,6 +17,7 @@ configured with Ansible, and operated via ArgoCD GitOps.
 - **Queue**: Redis
 - **Package manager**: Helm
 - **CI/CD**: GitHub Actions (sanity-checks.yml, cluster-sanity.yml)
+- **CI/CD**: GitHub Actions (sanity-checks.yml, cluster-sanity.yml)
 
 ## Repo Structure
 ```
@@ -55,6 +56,7 @@ scripts/
 - **ALWAYS** run `helm lint` before committing chart changes
 - **ALWAYS** update `docs/runbooks.md` when adding or changing operational procedures
 - **ALWAYS** run `./scripts/run-sanity-checks.sh` before opening a PR to catch issues early
+- **ALWAYS** run `./scripts/run-sanity-checks.sh` before opening a PR to catch issues early
 
 ## PR Format
 ```
@@ -78,6 +80,7 @@ Body:
 - [ ] terraform plan reviewed
 - [ ] No secrets in diff
 - [ ] Runbook updated (if applicable)
+- [ ] Local sanity checks passed (./scripts/run-sanity-checks.sh)
 - [ ] Local sanity checks passed (./scripts/run-sanity-checks.sh)
 - [ ] Resource limits set on all new pods
 ```

@@ -13,6 +13,8 @@ Argus Infra is a fully GitOps-driven Kubernetes homelab platform running on Hetz
 5. **Observability** — Prometheus, Grafana, and Loki for metrics and logs
 6. **Secrets** — External Secrets Operator with Doppler for secure credential management
 7. **Security** — Kubernetes NetworkPolicies for least-privilege pod network access
+8. **CI/CD & Testing** — GitHub Actions for validation, sanity checks, and c
+7. **Security** — Kubernetes NetworkPolicies for least-privilege pod network access
 8. **CI/CD & Testing** — GitHub Actions for validation, sanity checks, and cluster health monitoring
 
 ## 2. Infrastructure Provisioning (Terraform/OpenTofu)
