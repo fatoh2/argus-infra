@@ -417,3 +417,47 @@ Run from the repository root:
     kubectl port-forward -n monitoring svc/prometheus-kube-prometheus-stack-prometheus 9090:9090
     # Then visit http://localhost:9090/targets
     ```
+
+---
+
+## 6. CI/CD Pipeline
+
+### CI: Pull Request Validation
+Every PR to `develop` runs sanity checks automatically via GitHub Actions (`.github/workflows/sanity-checks.yml`).
+
+**What's checked:**
+- Terraform validate + format
+- Ansible syntax + lint
+
+**If CI fails:**
+1. Click "Details" on the failing check in the PR
+2. Fix the issue in your branch
+3. Push again — CI re-runs automatically
+
+### CD: Continuous Deployment
+Every merge to `main` triggers the CD workflow (`.github/workflows/cd-deploy.yml`).
+
+**What happens:**
+1. Validation runs (same as CI)
+2. ArgoCD detects the change (via webhook or polling)
+3. ArgoCD syncs the cluster to match `main`
+
+**Monitoring a deployment:**
+```bash
+# Check ArgoCD app status
+argocd app list
+
+# Check sync status of root app
+argocd app get argocd-root
+
+# Watch sync in real-time
+argocd app sync argocd-root --watch
+```
+
+**If ArgoCD sync fails:**
+1. Check the ArgoCD UI for error details
+2. Fix the manifest in a new branch
+3. Open a PR, merge to `develop`, then merge to `main`
+4. ArgoCD will re-sync automatically
+
+See `docs/cicd.md` for full pipeline documentation.

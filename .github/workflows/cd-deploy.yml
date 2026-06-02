@@ -1,0 +1,80 @@
+name: CD Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  ANSIBLE_CONFIG: ansible/ansible.cfg
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.7
+
+      - name: Terraform Validate
+        run: |
+          cd terraform/environments/homelab
+          terraform init -backend=false
+          terraform validate
+
+      - name: Terraform Format Check
+        run: |
+          cd terraform/environments/homelab
+          terraform fmt -check
+
+      - name: Setup Python virtual environment for Ansible Lint
+        run: |
+          python3 -m venv /tmp/ansible-lint-venv
+          /tmp/ansible-lint-venv/bin/pip install ansible-lint
+
+      - name: Install Ansible Galaxy Collections
+        run: |
+          /tmp/ansible-lint-venv/bin/ansible-galaxy collection install -r ansible/requirements.yml
+
+      - name: Ansible Syntax Check
+        run: |
+          /tmp/ansible-lint-venv/bin/ansible-playbook --syntax-check \
+            -i ansible/inventory/homelab.ci.yml ansible/playbooks/site.yml
+
+      - name: Ansible Lint
+        run: |
+          /tmp/ansible-lint-venv/bin/ansible-lint ansible/playbooks/ ansible/roles/
+
+  argocd-sync:
+    name: Trigger ArgoCD Sync
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Notify ArgoCD Sync
+        run: |
+          echo "::notice::Merge to main detected. ArgoCD watches main branch and will auto-sync."
+          echo "::notice::Commit: ${{ github.sha }}"
+          echo "::notice::Triggered by: ${{ github.actor }}"
+
+      - name: ArgoCD Sync via API (optional)
+        if: ${{ vars.ARGOCD_SERVER != '' && secrets.ARGOCD_TOKEN != '' }}
+        env:
+          ARGOCD_SERVER: ${{ vars.ARGOCD_SERVER }}
+          ARGOCD_TOKEN: ${{ secrets.ARGOCD_TOKEN }}
+        run: |
+          # Trigger sync on the root app-of-apps so ArgoCD picks up changes immediately
+          # rather than waiting for its default polling interval (3 minutes).
+          curl -sS -X POST \
+            "https://${ARGOCD_SERVER}/api/v1/applications/argocd-root/sync" \
+            -H "Authorization: Bearer ${ARGOCD_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"prune": true, "dryRun": false, "strategy": {"hook": {}}}' \
+            || echo "::warning::ArgoCD sync API call failed — cluster may not be reachable from CI. ArgoCD will auto-sync within its polling interval."
