@@ -77,7 +77,7 @@ argus-infra/
 │   ├── setup.md            # Setup guide
 │   └── adr/                # Architecture Decision Records
 └── .github/workflows/      # CI/CD pipeline
-    ├── sanity-checks.yml   # PR-level Terraform + Ansible validation, CD-level ArgoCD sync
+    ├── sanity-checks.yml   # PR-level Terraform + Ansible validation (CI)
     ├── cd-deploy.yml       # CD pipeline (lint → build → ArgoCD sync)
     └── cluster-sanity.yml  # Cluster-level health checks (scheduled)
 ```
@@ -101,21 +101,9 @@ See [docs/cicd.md](docs/cicd.md) for full pipeline documentation and [docs/runbo
 - **Network Policies** — default-deny on all namespaces with explicit allow rules for least-privilege pod communication
 - **Pod Security Standards** — restricted profile enforced on all namespaces; workloads configured with `runAsNonRoot`, `readOnlyRootFilesystem`, and dropped capabilities
 - **Least-Privilege RBAC** — dedicated ServiceAccounts for each service with minimum required permissions; `api-service` has zero k8s API access
-- **CI/CD-validated** — Terraform validate + fmt, Ansible syntax check + lint, ShellCheck, critical file checks on every PR; CD pipeline validates and triggers ArgoCD sync on merge to main
-- **Cluster health monitoring** — scheduled cluster sanity checks (nodes, pods, ArgoCD apps, ingress) every 6 hours
-- **Local sanity suite** — run `./scripts/run-sanity-checks.sh` before committing to catch issues early
-
-## Architecture
-
-See [docs/architecture.md](docs/architecture.md) for a detailed breakdown of all components.
-
-## Prerequisites
-
-- [Hetzner Cloud](https://www.hetzner.com/cloud) account with API token
-- [Terraform](https://developer.hashicorp.com/terraform/downloads) v1.0+
-- [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/index.html) v2.10+
-- [kubectl](https://kubernetes.io/docs/tasks/tools/)
-
-## License
-
-MIT
+- **CI/CD-validated**
+- **Automated Backups** — PostgreSQL backups to Backblaze B2 via pgbackrest
+- **Disaster Recovery** — documented restore procedures in `docs/runbooks.md`
+- **Idempotent Provisioning** — Terraform and Ansible ensure consistent, repeatable deployments
+- **Scalable** — easily add more worker nodes to the k3s cluster
+- **Cost-Optimized** — leverages Hetzner Cloud's affordable VMs
