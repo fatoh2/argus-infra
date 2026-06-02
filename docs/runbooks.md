@@ -17,7 +17,18 @@ bash scripts/install-tools.sh
 bash scripts/install-tools.sh --quiet   # minimal output
 ```
 
-The script is idempotent — re-running it skips already-installed tools. It targets Ubuntu/Debian 22.04+ and requires `sudo` access for binary installation to `/usr/local/bin/`.
+The script is idempotent — re-running it skips already-installed tools. It supports Ubuntu/Debian (22.04+), macOS, and Windows (Git Bash / WSL2). On Linux/macOS it requires `sudo` access for binary installation to `/usr/local/bin/`. On macOS, uses `sudo mv` + `sudo chmod` instead of `sudo install` for compatibility.
+
+### Key Improvements in v2
+
+| Feature | Description |
+|---------|-------------|
+| **Multi-OS detection** | `detect_os()` function catches Git Bash (`msys`/`cygwin`), WSL2 (`/proc/version`), macOS (`darwin*`), and Linux |
+| **GitHub API fallback** | If rate-limited, uses hardcoded fallback versions (Terraform 1.7.5, kubeseal v0.27.1) with a warning |
+| **macOS compat** | Uses `sudo mv` + `sudo chmod` instead of `sudo install -o root -g root` |
+| **PATH fix** | Adds `~/.local/bin` to PATH before verifying pip-installed Ansible |
+| **Explicit errors** | Failed `apt-get update` shows a clear warning instead of failing silently |
+| **Quiet mode** | `--quiet` flag for minimal output in automated/CI environments |
 
 ### Check Tool Versions
 
@@ -29,13 +40,13 @@ make check-versions
 bash scripts/versions.sh
 ```
 
-This prints versions for all tools plus Ansible collection versions and system info (OS, kernel, arch). Useful for debugging environment issues.
+This prints versions for Terraform, kubectl, Helm, k3d, Ansible, ArgoCD CLI, kubeseal, shellcheck, git, and Docker — plus system info (OS, kernel, arch). Useful for debugging environment issues.
 
 ### What Gets Installed
 
 | Tool | Version | Source |
 |------|---------|--------|
-| Terraform | 1.5.7 (pinned) | HashiCorp releases |
+| Terraform | 1.7.5 (pinned) | HashiCorp releases |
 | Ansible (ansible-core) | latest (apt) | Ubuntu repos |
 | kubectl | latest stable | Kubernetes releases |
 | Helm | v3.17.2 | Helm releases |
@@ -60,6 +71,8 @@ The root `Makefile` provides convenient shortcuts for common operations:
 | `make local-down` | Tear down local k3d cluster |
 | `make check-versions` | Print installed tool versions |
 | `make sanity` | Run full local sanity check suite |
+| `make setup-windows` | Show Windows setup guide |
+| `make bootstrap` | Run Windows bootstrap script (`BOOTSTRAP_WINDOWS.sh`) |
 
 All targets gracefully skip missing tools. Run `make` (or `make help`) to see the full list.
 
@@ -569,8 +582,8 @@ bash scripts/local-cluster.sh
 ```
 
 This creates a k3d cluster named `argus-local` with:
-- Port mappings: `8080:80` (HTTP) and `8443:443` (HTTPS) via the k3d loadbalancer
-- **ArgoCD** installed from official manifests in the `argocd` namespace
+- Port mappings: `80:80` (HTTP) and `443:443` (HTTPS) via the k3d loadbalancer
+- **ArgoCD** installed via Helm in the `argocd` namespace (admin password: `admin`)
 - **kube-prometheus-stack** (Prometheus + Grafana + AlertManager) in the `monitoring` namespace
 - **Loki** (log aggregation) in the `logging` namespace
 
@@ -583,9 +596,9 @@ The script is fully idempotent:
 
 ```bash
 # ArgoCD UI
-kubectl port-forward svc/argocd-server -n argocd 8080:80
-# Get initial password:
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
+kubectl port-forward -n argocd svc/argocd-server 8080:443
+# Open: https://localhost:8080
+# User: admin | Password: admin
 
 # Grafana
 kubectl port-forward svc/prometheus-grafana -n monitoring 3000:80
@@ -627,7 +640,7 @@ This deletes the entire `argus-local` k3d cluster. All resources (pods, volumes,
 | Cluster already exists | Previous cluster not torn down | Run `bash scripts/local-cluster-down.sh` first |
 | ArgoCD pods stuck in Pending | Insufficient resources | Increase Docker resources (min 4GB RAM, 2 CPUs) |
 | Helm install fails | Helm repo not updated | Script handles this with `helm repo update` |
-| Port conflicts | `:8080` or `:8443` already in use | Stop other services using those ports, or modify the script |
+| Port conflicts | `:80` or `:443` already in use | Stop other services using those ports, or modify the script |
 
 ## GCP VM Deployment
 
@@ -650,7 +663,7 @@ terraform plan
 terraform apply
 
 # 5. Connect
-ssh argus@$(terraform output -raw instance_public_ip)
+ssh argus@$(terraform output -raw public_ip)
 ```
 
 ### Destroy the VM
@@ -706,9 +719,6 @@ $(terraform output -raw kubectl_configure_command)
 
 # 6. Verify
 kubectl get nodes
-
-# 7. (Optional) Use the generated kubeconfig
-export KUBECONFIG=$(terraform output -raw kubeconfig_path)
 ```
 
 ### Destroy the GKE Cluster
@@ -772,7 +782,7 @@ terraform plan
 terraform apply
 
 # 5. Connect
-ssh argus@$(terraform output -raw instance_public_ip)
+ssh argus@$(terraform output -raw public_ip)
 ```
 
 ### Destroy the EC2 Instance

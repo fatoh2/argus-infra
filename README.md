@@ -38,6 +38,28 @@ make local-up
 make local-down
 ```
 
+### Windows
+
+For Windows development, see the [Windows Setup Guide](SETUP_WINDOWS.md).
+
+```bash
+# 0. Run the bootstrap script (Git Bash or WSL2) to check prerequisites
+bash BOOTSTRAP_WINDOWS.sh
+
+# 1. Install required CLI tools
+make install-tools
+
+# 2. Create local cluster with ArgoCD, Prometheus, and Loki
+make local-up
+
+# 3. Tear down when done
+make local-down
+```
+
+> **Note:** On Windows, use **Git Bash** (not Command Prompt or PowerShell) for shell commands.
+> Docker Desktop with WSL2 backend is required for k3d clusters.
+> See [SETUP_WINDOWS.md](SETUP_WINDOWS.md) for detailed Windows setup instructions.
+
 ### Production (Hetzner Cloud)
 
 ```bash
@@ -77,10 +99,10 @@ cp terraform.tfvars.example terraform.tfvars
 terraform init && terraform apply
 
 # 2. Connect via SSH
-ssh argus@$(terraform output -raw instance_public_ip)
+ssh argus@$(terraform output -raw public_ip)
 
 # 3. Verify Docker is running
-ssh argus@$(terraform output -raw instance_public_ip) "docker --version && docker compose version"
+ssh argus@$(terraform output -raw public_ip) "docker --version && docker compose version"
 ```
 
 See the [GCP module documentation](docs/architecture.md#15-gcp-compute-engine-module) for full details.
@@ -125,10 +147,10 @@ cp terraform.tfvars.example terraform.tfvars
 terraform init && terraform apply
 
 # 2. Connect via SSH
-ssh argus@$(terraform output -raw instance_public_ip)
+ssh argus@$(terraform output -raw public_ip)
 
 # 3. Verify Docker is running
-ssh argus@$(terraform output -raw instance_public_ip) "docker --version && docker compose version"
+ssh argus@$(terraform output -raw public_ip) "docker --version && docker compose version"
 ```
 
 See the [AWS EC2 module documentation](docs/architecture.md#17-aws-ec2-module) for full details.
@@ -145,6 +167,8 @@ The project includes a `Makefile` with common infra operations. Run `make` or `m
 | `make install-tools` | Install CLI tools (Terraform, Ansible, kubectl, etc.) | sudo access |
 | `make local-up` | Spin up local k3d cluster for testing | k3d |
 | `make local-down` | Tear down local k3d cluster | k3d |
+| `make setup-windows` | Show Windows setup guide and Docker Desktop instructions | — |
+| `make bootstrap` | Run Windows bootstrap script (checks prerequisites) | Git Bash / WSL2 |
 | `make check-versions` | Print installed tool versions | — |
 | `make sanity` | Run full local sanity check suite | Installed tools |
 
@@ -179,7 +203,9 @@ argus-infra/
 │   │   ├── pod-security/       # Pod Security Standards (restricted profile)
 │   │   └── rbac/               # Least-privilege ServiceAccounts
 │   └── cluster-issuer/      # Let's Encrypt ClusterIssuers
-├── scripts/                 # Operational and CI scripts
+├── BOOTSTRAP_WINDOWS.sh      # Windows bootstrap — checks Docker, kubectl, k3d, helm prerequisites
+├── SETUP_WINDOWS.md           # Windows setup guide (Docker Desktop, WSL2, Chocolatey)
+├── scripts/                   # Operational and CI scripts
 │   ├── install-tools.sh        # One-command tool installation (Terraform, Ansible, kubectl, Helm, ArgoCD, k3d, kubeseal)
 │   ├── versions.sh             # Print all tool versions for debugging
 │   ├── run-sanity-checks.sh    # Local sanity suite (Terraform, Ansible, ArgoCD)
@@ -216,7 +242,7 @@ See [docs/cicd.md](docs/cicd.md) for full pipeline documentation and [docs/runbo
 - **Automatic TLS** — wildcard certificate via Let's Encrypt + cert-manager
 - **Observability out of the box** — Prometheus metrics, Grafana dashboards (Node Exporter Full, Kubernetes Cluster Overview), Loki logs
 - **Secure by default** — External Secrets Operator + Doppler for secret injection, NetworkPolicies for least-privilege access, Pod Security Standards (restricted profile)
-- **Makefile-driven workflow** — `make lint`, `make validate`, `make plan`, `make install-tools`, `make local-up/down`, `make check-versions`, `make sanity`
+- **Makefile-driven workflow** — `make lint`, `make validate`, `make plan`, `make install-tools`, `make local-up/down, make setup-windows, make bootstrap`, `make check-versions`, `make sanity`
 - **Local development** — k3d cluster for testing without cloud costs
 - **Multi-cloud support** — Hetzner Cloud (k3s cluster), GCP Compute Engine (single VM), GCP GKE (managed Kubernetes), and AWS EC2 (single VM) deployment options
 - **Automated CI/CD** — GitHub Actions validate every PR and deploy on merge to `main`

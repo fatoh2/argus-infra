@@ -208,7 +208,48 @@ The `cluster-sanity.yml` workflow runs on a scheduled basis (every 6 hours) to p
 | Disk Usage | Node disk usage is below 80% |
 | API Response | Cluster API is responsive |
 
-## 11. Data Flow
+## 11. Local Development (k3d)
+
+For local testing and development, Argus Infra supports running a lightweight Kubernetes cluster using k3d. This allows developers to test infrastructure changes, ArgoCD configurations, and monitoring stacks without provisioning cloud resources.
+
+### Architecture
+
+The local development environment mirrors the production setup but runs entirely in Docker containers managed by k3d:
+
+| Component | Local (k3d) | Production (Hetzner) |
+|-----------|-------------|----------------------|
+| **Cluster** | k3d (1 server + 2 agents) | k3s (1 server + N workers) |
+| **GitOps** | ArgoCD (Helm install) | ArgoCD (app-of-apps) |
+| **Monitoring** | Prometheus + Grafana (kube-prometheus-stack) | Prometheus + Grafana (kube-prometheus-stack) |
+| **Logging** | Loki + Promtail (loki-stack) | Loki + Promtail (loki-stack) |
+| **Ingress** | k3d built-in loadbalancer | Traefik + cert-manager |
+
+### Scripts
+
+Two scripts manage the local cluster lifecycle:
+
+- **`scripts/local-cluster.sh`** — Creates a k3d cluster named `argus-local` with port mappings (80:80, 443:443), installs ArgoCD via Helm, and optionally installs Prometheus/Grafana and Loki. The ArgoCD admin password is set to `admin` for convenience.
+
+- **`scripts/local-cluster-down.sh`** — Tears down the k3d cluster, removes the kubeconfig file, and cleans up the local registry.
+
+### Makefile Targets
+
+| Target | Description |
+|--------|-------------|
+| `make local-up` | Runs `scripts/local-cluster.sh` |
+| `make local-down` | Runs `scripts/local-cluster-down.sh` |
+
+### Windows Support
+
+On Windows, the repository includes:
+
+- **`BOOTSTRAP_WINDOWS.sh`** — A bash script that checks for essential tools (Docker, kubectl, k3d, Helm) and provides installation guidance. Run this in Git Bash or WSL2 before using the Makefile.
+
+- **`SETUP_WINDOWS.md`** — A comprehensive guide covering Docker Desktop setup, Chocolatey installation, WSL2 configuration, and troubleshooting for Windows-specific issues.
+
+See the [Windows Setup Guide](../SETUP_WINDOWS.md) for detailed instructions.
+
+## 12. Data Flow
 
 ```
 User → Traefik (Ingress) → cert-manager (TLS) → Service → Pod
@@ -224,7 +265,7 @@ User → Traefik (Ingress) → cert-manager (TLS) → Service → Pod
 4. Grafana queries Prometheus for metrics and Loki for logs.
 5. All inter-pod communication is governed by NetworkPolicies.
 
-## 12. Backup & Disaster Recovery
+## 13. Backup & Disaster Recovery
 
 ### PostgreSQL Backups
 - **Tool:** pgbackrest
@@ -238,7 +279,7 @@ See [docs/runbooks.md](runbooks.md) for detailed restore procedures, including:
 - Full cluster restore
 - Individual database restore
 
-## 13. Design Decisions
+## 14. Design Decisions
 
 ### Why k3s over kubeadm?
 - **Simplicity:** Single binary installation, embedded etcd, built-in CoreDNS and Traefik.
@@ -260,14 +301,14 @@ See [docs/runbooks.md](runbooks.md) for detailed restore procedures, including:
 - **Centralized Management:** Secrets are managed in Doppler, providing a single source of truth for all secrets across all environments.
 - **Audit Trail:** Doppler provides detailed audit logs for all secret access and changes.
 
-## 14. Future Considerations
+## 15. Future Considerations
 
 - **Multi-Node Control Plane:** For production environments, consider adding multiple control plane nodes for high availability.
 - **Cluster Autoscaling:** Implement cluster autoscaler to automatically add/remove worker nodes based on resource utilization.
 - **Service Mesh:** Evaluate Istio or Linkerd for advanced traffic management, observability, and security features.
 - **Disaster Recovery:** Implement cross-region backup and recovery for the entire cluster state.
 
-## 15. GCP Compute Engine Module
+## 16. GCP Compute Engine Module
 
 Argus Infra includes a Terraform module for deploying a single VM on Google Cloud Platform (GCP). This is useful for lightweight deployments, testing, or running Argus components that don't require a full Kubernetes cluster.
 
@@ -333,13 +374,8 @@ module "argus_vm" {
 |---|---|
 | `instance_id` | Instance ID |
 | `instance_name` | Instance name |
-| `instance_self_link` | Self-link (URI) of the instance |
-| `zone` | GCP zone where the instance was created |
-| `machine_type` | Machine type of the instance |
 | `network_ip` | Private IP address |
 | `nat_ip` | Public IP address (if enabled) |
-| `nat_ips` | List of external IPs assigned to the instance |
-| `instance_public_ip` | Alias for `nat_ip` — external public IP (if enabled) |
 | `ssh_command` | Ready-to-use SSH command |
 | `firewall_rule_names` | Created firewall rule names |
 
@@ -360,10 +396,10 @@ terraform plan
 terraform apply
 
 # Connect
-ssh argus@$(terraform output -raw instance_public_ip)
+ssh argus@$(terraform output -raw public_ip)
 ```
 
-## 16. GCP GKE Module
+## 17. GCP GKE Module
 
 Argus Infra includes a Terraform module for deploying a Google Kubernetes Engine (GKE) cluster on GCP. This enables running Argus on a managed Kubernetes service with Autopilot mode for reduced operational overhead.
 
@@ -384,26 +420,7 @@ Argus Infra includes a Terraform module for deploying a Google Kubernetes Engine
 - `deletion_protection` — Prevent accidental cluster deletion
 - `helm_repos` — Map of Helm repositories to add after cluster creation
 
-**Outputs:**
-
-| Output | Description |
-|---|---|
-| `cluster_id` | GKE cluster ID |
-| `cluster_name` | GKE cluster name |
-| `cluster_location` | Location (region or zone) of the GKE cluster |
-| `cluster_endpoint` | Cluster Kubernetes endpoint IP/DNS |
-| `cluster_ca_certificate` | Base64-encoded CA certificate (sensitive) |
-| `cluster_kubernetes_version` | Kubernetes version running on the cluster |
-| `cluster_autopilot_enabled` | Whether Autopilot mode is enabled |
-| `cluster_release_channel` | GKE release channel (REGULAR/RAPID/STABLE) |
-| `kubeconfig_path` | Path to generated kubeconfig file (if `generate_kubeconfig` is enabled) |
-| `kubeconfig_generated` | Whether a kubeconfig file was generated |
-| `kubectl_configure_command` | Command to configure kubectl for this cluster |
-| `network` | VPC network used by the cluster |
-| `subnetwork` | Subnetwork used by the cluster |
-| `cluster_self_link` | Self-link (URI) of the GKE cluster |
-| `node_pool_name` | Primary node pool name (Standard mode only) |
-| `node_pool_node_count` | Primary node pool node count (Standard mode only) |
+**Outputs:** Cluster ID, name, endpoint, CA certificate, kubeconfig path, kubectl configure command, list of Helm repos added.
 
 **Default Helm Repos Added:**
 | Name | URL |
@@ -432,7 +449,7 @@ module "argus_gke" {
 **Done when:** `kubectl get nodes` shows all nodes in Ready state.
 
 
-## 17. AWS EC2 Module
+## 18. AWS EC2 Module
 
 Argus Infra includes a Terraform module for deploying a single EC2 instance on Amazon Web Services (AWS). This mirrors the GCP Compute Engine module and is useful for lightweight deployments, testing, or running Argus components on AWS without a full Kubernetes cluster.
 
@@ -509,8 +526,7 @@ module "argus_ec2" {
 | `instance_arn` | EC2 instance ARN |
 | `instance_state` | EC2 instance state |
 | `instance_type` | EC2 instance type |
-| `public_ip` | Public IP address (Elastic IP if enabled, otherwise ephemeral) |
-| `instance_public_ip` | Alias for `public_ip` — public IP address (Elastic IP if enabled, otherwise ephemeral) |
+| `public_ip` | Public IP address (if Elastic IP enabled) |
 | `private_ip` | Private IP address |
 | `public_dns` | Public DNS name |
 | `vpc_id` | VPC ID |
@@ -540,7 +556,7 @@ terraform plan
 terraform apply
 
 # Connect
-ssh argus@$(terraform output -raw instance_public_ip)
+ssh argus@$(terraform output -raw public_ip)
 ```
 
 ### What the module does NOT do

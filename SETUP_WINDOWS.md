@@ -1,252 +1,97 @@
-# Argus Infra — Setup on Windows
+# Argus Infra — Windows Setup
 
-## Overview
-
-Running Argus Infra on Windows requires Docker Desktop with WSL2, and several CLI tools. This guide provides Windows-specific setup instructions.
+This guide walks through setting up the argus-infra toolchain on Windows.
 
 ## Prerequisites
 
-### Option A: Docker Desktop (Recommended)
+- **Windows 10 or 11** (64-bit)
+- **Administrator access** (for installing tools)
+- **Git for Windows** — includes Git Bash, which is required for running shell scripts
+  - Download from: https://git-scm.com/download/win
+  - During install, select "Git from the command line and also from 3rd-party software"
+  - Select "Use Windows' default console window" (for better compatibility)
 
-1. **Install Docker Desktop for Windows**
-   - Download: https://www.docker.com/products/docker-desktop
-   - During installation, enable **WSL2 backend**
-   - This includes: Docker, kubectl, docker-compose
-   - **Best option** for local k3d cluster development
+## Step 0: Install make
 
-### Option B: WSL2 + Native Tools
+The Makefile targets call shell scripts, but `make` itself is not installed by default on Windows.
 
-1. **Install WSL2**
-   ```powershell
-   wsl --install
-   # Then restart and launch Ubuntu from Windows Terminal
-   ```
+**Option A (Recommended):** Run the bootstrap script as Administrator:
 
-2. Run the install script inside WSL2:
-   ```bash
-   cd /mnt/c/Workstation/argus-infra
-   bash scripts/install-tools.sh
-   ```
+1. Right-click `BOOTSTRAP_WINDOWS.bat` in the repo root
+2. Select **"Run as administrator"**
+3. Follow the prompts — this installs Chocolatey and `make`
 
-### Option C: Chocolatey (All-in-one)
-
-Install [Chocolatey](https://chocolatey.org/install), then:
+**Option B (Manual):** Install via Chocolatey manually:
 
 ```powershell
-choco install terraform kubernetes-cli kubernetes-helm k3d git
+# Run PowerShell as Administrator
+Set-ExecutionPolicy Bypass -Scope Process -Force
+[System.Net.ServicePointManager]::SecurityProtocol = 3072
+iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+choco install make -y
 ```
 
-## Quick Start on Windows
-
-### Step 1: Verify Prerequisites
+**Option C (WSL2):** Use Windows Subsystem for Linux 2 for full Linux compatibility:
 
 ```powershell
-# Check what's installed
+# Run PowerShell as Administrator
+wsl --install -d Ubuntu
+# Then follow the Linux setup guide inside WSL2
+```
+
+## Step 1: Install CLI tools
+
+After installing `make`, open **Git Bash** (not Command Prompt, not PowerShell) and run:
+
+```bash
+cd /path/to/argus-infra
+make install-tools
+```
+
+This installs: Terraform, Ansible, kubectl, Helm, k3d, kubeseal, and other dependencies.
+
+> **Note:** If `make install-tools` fails on a specific tool, you can install it manually.
+> See [docs/setup.md](docs/setup.md) for manual installation instructions.
+
+## Step 2: Verify installation
+
+```bash
 make check-versions
 ```
 
-You should see:
-- ✓ docker
-- ✓ k3d
-- ✓ kubectl
-- ✓ helm
+All tools should show their installed versions.
 
-### Step 2: Create Local k3d Cluster
+## Step 3: Start local cluster
 
-```powershell
-# Spin up cluster with monitoring
+```bash
 make local-up
 ```
 
-This creates:
-- k3d cluster named `argus-local`
-- ArgoCD (GitOps)
-- Prometheus + Grafana (metrics)
-- Loki (logs)
-
-### Step 3: Access Services
-
-**ArgoCD UI:**
-```powershell
-kubectl port-forward -n argocd svc/argocd-server 8080:443
-```
-Then open: https://localhost:8080
-
-Default credentials:
-- Username: `admin`
-- Password: Get from secret:
-  ```powershell
-  kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
-  ```
-
-**Grafana (Monitoring):**
-```powershell
-kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
-```
-Then open: http://localhost:3000
-- Username: `admin`
-- Password: `prom-operator`
-
-### Step 4: Teardown
-
-```powershell
-make local-down
-```
-
-## Tool Installation Details
-
-### Docker Desktop (Recommended)
-
-1. Download from https://www.docker.com/products/docker-desktop
-2. Run installer (docker-desktop-installer.exe)
-3. **Important**: During setup, check "Use WSL 2 based engine"
-4. Restart Windows
-5. Open PowerShell and verify:
-   ```powershell
-   docker --version
-   kubectl version --client
-   ```
-
-### Terraform
-
-**Chocolatey:**
-```powershell
-choco install terraform
-```
-
-**Manual:**
-1. Download: https://releases.hashicorp.com/terraform/
-2. Extract to: `C:\Program Files\Terraform`
-3. Add to PATH (System Environment Variables)
-
-### kubectl
-
-Included with Docker Desktop. If not:
-```powershell
-choco install kubernetes-cli
-```
-
-### Helm
-
-**Chocolatey:**
-```powershell
-choco install kubernetes-helm
-```
-
-**Manual:**
-1. Download: https://github.com/helm/helm/releases
-2. Extract to: `C:\Program Files\Helm`
-3. Add to PATH
-
-### k3d
-
-**Chocolatey:**
-```powershell
-choco install k3d
-```
-
-**Manual:**
-```powershell
-choco install k3d --pre
-```
-
-### Ansible
-
-⚠️ **Note:** Ansible on Windows is limited. For best results:
-- Use WSL2 (recommended)
-- Or use Docker container:
-  ```powershell
-  docker run -v C:\Workstation\argus-infra:/workspace -w /workspace ansible/ansible:latest ansible-playbook -i inventory playbooks/site.yml
-  ```
+This creates a local k3d Kubernetes cluster with ArgoCD and monitoring.
 
 ## Troubleshooting
 
-### "docker: command not found"
-- Ensure Docker Desktop is **running** (check system tray)
-- Add Docker to PATH: Settings → System → Environment Variables
-- Restart PowerShell
+### "make" is not recognized
 
-### "k3d: command not found"
-```powershell
-choco install k3d
-# Or install manually from: https://k3d.io/
-```
+Run `BOOTSTRAP_WINDOWS.bat` as Administrator first, or install make via Chocolatey manually.
 
-### "kubectl: command not found"
-Docker Desktop includes kubectl. If missing:
-```powershell
-choco install kubernetes-cli
-```
+### Shell scripts fail with syntax errors
 
-### WSL2 Issues
-```powershell
-# Update WSL
-wsl --update
+Always use **Git Bash** (not Command Prompt or PowerShell) to run shell scripts.
+Git Bash provides a Unix-like environment that the scripts expect.
 
-# Check WSL version
-wsl --list --verbose
+### k3d fails to start
 
-# Switch to WSL2
-wsl --set-default-version 2
-```
+- Ensure Docker Desktop is running
+- Try: `make local-down && make local-up`
+- If issues persist, restart Docker Desktop
 
-### Port Conflicts (8080, 3000, 443)
-If ports are in use:
-```powershell
-# Find what's using port 8080
-netstat -ano | findstr :8080
+### ArgoCD login fails
 
-# Kill process (replace PID)
-taskkill /PID <PID> /F
-```
+- Wait 2-3 minutes for ArgoCD to fully initialize
+- Run: `kubectl wait --for=condition=Available deployment/argocd-server -n argocd --timeout=180s`
+- Then retry: `kubectl port-forward -n argocd svc/argocd-server 8080:80`
 
-Or use different ports:
-```powershell
-kubectl port-forward -n argocd svc/argocd-server 8888:443
-# Open https://localhost:8888
-```
+### Need help?
 
-## Environment Variables
-
-Optional, but useful:
-
-**PowerShell Profile** (`$PROFILE`)
-```powershell
-# Add to C:\Users\<YourUser>\Documents\PowerShell\profile.ps1
-
-# Kubernetes
-$env:KUBECONFIG = "~/.kube/config"
-
-# Disable Ansible warnings on Windows
-$env:ANSIBLE_COMMAND_WARNINGS = $false
-```
-
-## Next Steps
-
-- Review infrastructure docs: `docs/setup.md`
-- Check architecture: `docs/architecture.md`
-- See Terraform examples: `terraform/environments/homelab`
-- Run validation: `make sanity`
-
-## Windows-Specific Notes
-
-- **Path style**: Use `/` in bash scripts (even on Windows), use `\` in PowerShell
-- **Line endings**: Git will convert CRLF ↔ LF automatically
-- **Symlinks**: k3d handles these internally; no admin elevation needed
-- **Firewall**: k3d may prompt to allow Docker access
-- **WSL2 memory**: By default uses ~50% of RAM; configure in `%UserProfile%\.wslconfig`:
-  ```ini
-  [wsl2]
-  memory=8GB
-  processors=4
-  ```
-
-## Support
-
-For issues:
-1. Check Docker Desktop is running
-2. Restart Docker Desktop if needed
-3. Verify WSL2 is installed: `wsl --list --verbose`
-4. Review Docker logs: Docker Desktop → Settings → Troubleshoot → Logs
-5. Run `make check-versions` to verify all tools
-
+Open an issue at: https://github.com/fatoh2/argus-infra/issues
