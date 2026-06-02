@@ -628,3 +628,55 @@ This deletes the entire `argus-local` k3d cluster. All resources (pods, volumes,
 | ArgoCD pods stuck in Pending | Insufficient resources | Increase Docker resources (min 4GB RAM, 2 CPUs) |
 | Helm install fails | Helm repo not updated | Script handles this with `helm repo update` |
 | Port conflicts | `:8080` or `:8443` already in use | Stop other services using those ports, or modify the script |
+
+## GCP VM Deployment
+
+### Provision a Single VM on GCP
+
+```bash
+cd terraform/environments/gcp-single-vm
+
+# 1. Configure
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your GCP project ID and SSH public key
+
+# 2. Initialize
+terraform init
+
+# 3. Preview
+terraform plan
+
+# 4. Apply
+terraform apply
+
+# 5. Connect
+ssh argus@$(terraform output -raw public_ip)
+```
+
+### Destroy the VM
+
+```bash
+cd terraform/environments/gcp-single-vm
+terraform destroy
+```
+
+> **Warning:** `terraform destroy` will delete the VM, boot disk, and firewall rules. Data on the boot disk is lost unless a snapshot was taken.
+
+### SSH Access
+
+If you configured `ssh_public_key`, connect with:
+```bash
+ssh argus@<public-ip>
+```
+
+If using `gcloud`:
+```bash
+gcloud compute ssh argus-vm --zone=us-central1-a --project=<project-id>
+```
+
+### Docker Verification
+
+After the VM boots (wait ~2 minutes), verify Docker is running:
+```bash
+ssh argus@<public-ip> "docker --version && docker compose version"
+```
