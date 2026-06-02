@@ -40,6 +40,12 @@ scripts/
 .github/workflows/
   sanity-checks.yml      PR-level Terraform + Ansible validation
   cluster-sanity.yml     Scheduled cluster health checks (every 6h)
+  run-sanity-checks.sh   Local sanity suite (Terraform, Ansible, ArgoCD)
+  argocd-health.sh       ArgoCD app health check
+  cluster-sanity.sh      Full cluster-level sanity checks
+.github/workflows/
+  sanity-checks.yml      PR-level Terraform + Ansible validation
+  cluster-sanity.yml     Scheduled cluster health checks (every 6h)
   bootstrap.sh           One-command cluster setup
   restore-db.sh          Database restore from pgbackrest
   run-sanity-checks.sh   Local sanity suite (Terraform, Ansible, ArgoCD)
@@ -61,6 +67,12 @@ scripts/
 - **ALWAYS** run `helm lint` before committing chart changes
 - **ALWAYS** update `docs/runbooks.md` when adding or changing operational procedures
 - **ALWAYS** run `./scripts/run-sanity-checks.sh` before opening a PR to catch issues early
+  run-sanity-checks.sh   Local sanity suite (Terraform, Ansible, ArgoCD)
+  argocd-health.sh       ArgoCD app health check
+  cluster-sanity.sh      Full cluster-level sanity checks
+.github/workflows/
+  sanity-checks.yml      PR-level Terraform + Ansible validation
+  cluster-sanity.yml     Scheduled cluster health checks (every 6h)
   run-sanity-checks.sh   Local sanity suite (Terraform, Ansible, ArgoCD)
   argocd-health.sh       ArgoCD app health check
   cluster-sanity.sh      Full cluster-level sanity checks
@@ -91,8 +103,21 @@ Body:
 - [ ] No secrets in diff
 - [ ] Runbook updated (if applicable)
 - [ ] Local sanity checks passed (./scripts/run-sanity-checks.sh)
+- [ ] Local sanity checks passed (./scripts/run-sanity-checks.sh)
+  run-sanity-checks.sh   Local sanity suite (Terraform, Ansible, ArgoCD)
+  argocd-health.sh       ArgoCD app health check
+  cluster-sanity.sh      Full cluster-level sanity checks
+.github/workflows/
+  sanity-checks.yml      PR-level Terraform + Ansible validation
+  cluster-sanity.yml     Scheduled cluster health checks (every 6h)
 - [ ] Resource limits set on all new pods
 - [ ] Local sanity checks passed (./scripts/run-sanity-checks.sh)
+  run-sanity-checks.sh   Local sanity suite (Terraform, Ansible, ArgoCD)
+  argocd-health.sh       ArgoCD app health check
+  cluster-sanity.sh      Full cluster-level sanity checks
+.github/workflows/
+  sanity-checks.yml      PR-level Terraform + Ansible validation
+  cluster-sanity.yml     Scheduled cluster health checks (every 6h)
   run-sanity-checks.sh   Local sanity suite (Terraform, Ansible, ArgoCD)
   argocd-health.sh       ArgoCD app health check
   cluster-sanity.sh      Full cluster-level sanity checks

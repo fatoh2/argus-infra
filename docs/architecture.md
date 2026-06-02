@@ -344,3 +344,24 @@ The following namespaces are labeled (manifests in `k8s/security/pod-security/`)
 | `traefik` | Traefik ingress controller |
 | `cert-manager` | cert-manager operator |
 | `default` | General application workloads |
+
+## 9.5 Pod Security Standards
+
+Argus Infra enforces Kubernetes [Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/) at the **restricted** level across all application namespaces. This is the strictest built-in policy level and provides defense-in-depth alongside NetworkPolicies.
+
+### Namespace Labeling
+
+Each application namespace is labeled with Pod Security admission controller labels:
+
+
+
+The following namespaces are labeled (manifests in ):
+
+| Namespace | Purpose |
+|-----------|---------|
+|  | Prometheus, Grafana, Loki, Promtail |
+|  | PostgreSQL, Redis |
+|  | Traefik, cert-manager, wildcard TLS |
+|  | Traefik ingress controller |
+|  | cert-manager operator |
+|  | General application workloads |
