@@ -1,36 +1,49 @@
 # CI/CD Pipeline
 
-Argus Infra uses a two-tier CI/CD approach:
+Argus Infra uses a three-stage CI/CD pipeline:
 
-1. **CI (Continuous Integration)** — runs on every PR to `develop`
-2. **CD (Continuous Deployment)** — runs on every merge to `main`
+1. **Lint** — runs on every PR and merge to `main`
+2. **Build** — runs on every PR and merge to `main`
+3. **Deploy** — runs on every merge to `main` (triggers ArgoCD sync)
 
-## CI: Pull Request Validation
+## Stage 1: Lint
+## Stage 2: Build
 
-**File:** `.github/workflows/sanity-checks.yml`
+**File:** `.github/workflows/cd-deploy.yml`
 
-Triggered on every PR opened against `develop`. Runs:
+Triggered on every PR and merge to `main`. Runs:
 
 | Step | What it checks |
 |------|----------------|
 | Terraform Validate | `terraform validate` on the homelab environment |
-| Terraform Format | `terraform fmt -check` ensures consistent formatting |
-| Terraform Plan | Dry-run plan (targeting network module only) to catch config errors |
+| Terraform Plan | `terraform plan` dry-run to catch config errors |
 | Ansible Syntax | `ansible-playbook --syntax-check` validates playbook structure |
+| Critical Files | Checks for existence of essential project files |
+
+**Required to pass** before a PR can be merged to `develop` or before deployment to `main`.
+
+
+**File:** `.github/workflows/sanity-checks.yml`
+
+Triggered on every PR and merge to `main`. Runs:
+
+| Step | What it checks |
+|------|----------------|
+| Terraform Format | `terraform fmt -check -recursive` ensures consistent formatting |
+| ShellCheck | `shellcheck` validates shell script syntax |
 | Ansible Lint | `ansible-lint` enforces best practices across all playbooks and roles |
 
 **Required to pass** before a PR can be merged to `develop`.
 
-## CD: Continuous Deployment
+## Stage 3: Deploy
 
 **File:** `.github/workflows/cd-deploy.yml`
 
-Triggered on every push to `main`. Runs:
+Triggered on every push to `main` after the Build stage passes. Runs:
 
 | Step | What it does |
 |------|--------------|
-| Validate | Same sanity checks as CI (belt-and-suspenders) |
-| ArgoCD Sync | Notifies that a merge occurred; optionally triggers ArgoCD sync via API |
+| ArgoCD Sync | Triggers ArgoCD to sync the cluster state to match `main` |
 
 ### How ArgoCD GitOps Works
 
@@ -71,7 +84,7 @@ This is optional — ArgoCD will auto-sync within its default 3-minute polling i
 │  Developer   │     │  GitHub PR   │     │  ArgoCD     │
 │  pushes to   │────▶│  to develop  │────▶│  watches    │
 │  feature/    │     │              │     │  develop    │
-│  branch      │     │  CI: sanity  │     │  (preview)  │
+│  branch      │     │  Lint  │     │  (preview)  │
 └─────────────┘     │  checks      │     └─────────────┘
                     └──────┬───────┘
                            │
@@ -80,8 +93,8 @@ This is optional — ArgoCD will auto-sync within its default 3-minute polling i
                     │  PR merged   │     │  ArgoCD     │
                     │  to main     │────▶│  syncs to   │
                     │              │     │  cluster    │
-                    │  CD: validate│     │             │
-                    │  + sync      │     │  production │
+                    │  Build│     │             │
+                    │  + Deploy    │     │  production │
                     └──────────────┘     └─────────────┘
 ```
 
