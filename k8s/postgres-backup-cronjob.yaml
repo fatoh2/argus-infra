@@ -1,0 +1,54 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+spec:
+  schedule: "0 2 * * *" # Daily at 2 AM UTC
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+          - name: backup
+            image: amazon/aws-cli:latest
+            command: ["/bin/sh", "-c"]
+            args: ["PGPASSWORD= pg_dump -h postgresql-service -U backup_user -d argus_db | gzip | aws s3 cp - s3://your-backup-bucket/postgres-backup-2026-06-01-17-52-43.sql.gz"]
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
+              runAsNonRoot: true
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-backup-credentials
+                  key: password
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-s3-credentials
+                  key: access_key_id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-s3-credentials
+                  key: secret_access_key
+            - name: AWS_ENDPOINT
+              value: "http://minio.minio.svc.cluster.local:9000"
+            - name: AWS_BUCKET
+              value: "your-backup-bucket"
+            volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          volumes:
+          - name: tmp
+            emptyDir: {}
+          restartPolicy: OnFailure
+  backoffLimit: 3

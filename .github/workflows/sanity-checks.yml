@@ -78,7 +78,7 @@ jobs:
           /tmp/ansible-venv/bin/ansible-lint ansible/playbooks/ ansible/roles/
 
       - name: Script Syntax Check (ShellCheck)
-        uses: ludeeus/action-shellcheck@2.0.0
+        uses: ludeeus/action-shellcheck@master
         with:
           scandir: ./scripts
           severity: warning
