@@ -1,15 +1,16 @@
 # CI/CD Pipeline
 
-Argus Infra uses a two-tier CI/CD approach:
+Argus Infra uses a three-stage CI/CD pipeline:
 
-1. **CI (Continuous Integration)** — runs on every PR to `develop`
-2. **CD (Continuous Deployment)** — runs on every merge to `main`
+1. **Lint** — code quality checks (terraform fmt, ansible-lint, shellcheck)
+2. **Build** — infrastructure compilation checks (terraform validate + plan, ansible syntax, critical files)
+3. **Deploy** — ArgoCD GitOps sync
 
 ## CI: Pull Request Validation
 
 **File:** `.github/workflows/sanity-checks.yml`
 
-Triggered on every PR opened against `develop`. Runs:
+Triggered on every PR opened against `develop` and every push to `develop`/`main`. Runs:
 
 | Step | What it checks |
 |------|----------------|
@@ -18,6 +19,8 @@ Triggered on every PR opened against `develop`. Runs:
 | Terraform Plan | Dry-run plan (targeting network module only) to catch config errors |
 | Ansible Syntax | `ansible-playbook --syntax-check` validates playbook structure |
 | Ansible Lint | `ansible-lint` enforces best practices across all playbooks and roles |
+| ShellCheck | Static analysis for shell scripts in `scripts/` |
+| Critical Files | Ensures all required files exist (manifests, configs, docs) |
 
 **Required to pass** before a PR can be merged to `develop`.
 
@@ -25,18 +28,37 @@ Triggered on every PR opened against `develop`. Runs:
 
 **File:** `.github/workflows/cd-deploy.yml`
 
-Triggered on every push to `main`. Runs:
+Triggered on every push to `main`. Runs three sequential stages:
+
+### Stage 1: Lint
 
 | Step | What it does |
 |------|--------------|
-| Validate | Same sanity checks as CI (belt-and-suspenders) |
-| ArgoCD Sync | Notifies that a merge occurred; optionally triggers ArgoCD sync via API |
+| Terraform Format | `terraform fmt -check -recursive` ensures consistent formatting |
+| Ansible Lint | `ansible-lint` enforces best practices |
+| ShellCheck | Static analysis for shell scripts in `scripts/` |
+
+### Stage 2: Build (Validate + Plan)
+
+| Step | What it does |
+|------|--------------|
+| Terraform Validate | `terraform validate` confirms HCL syntax is correct |
+| Terraform Plan | Dry-run plan to verify configuration compiles end-to-end |
+| Ansible Syntax | `ansible-playbook --syntax-check` validates playbook structure |
+| Critical Files | Ensures all required files exist |
+
+### Stage 3: ArgoCD Sync
+
+| Step | What it does |
+|------|--------------|
+| Notify | Logs merge event details |
+| API Sync (optional) | Triggers ArgoCD sync via REST API if `ARGOCD_SERVER` and `ARGOCD_TOKEN` are configured |
 
 ### How ArgoCD GitOps Works
 
 ArgoCD is configured to watch the `main` branch of this repository. When a PR merges to `main`:
 
-1. GitHub Actions runs the CD workflow (validation + optional API sync)
+1. GitHub Actions runs the CD workflow (lint → build → sync)
 2. ArgoCD detects the change in Git (either via webhook or its 3-minute polling interval)
 3. ArgoCD syncs the cluster state to match the manifests in `main`
 4. ArgoCD reports sync status (Synced/OutOfSync/Error) in the ArgoCD UI
@@ -76,13 +98,23 @@ This is optional — ArgoCD will auto-sync within its default 3-minute polling i
                     └──────┬───────┘
                            │
                            ▼
-                    ┌──────────────┐     ┌─────────────┐
-                    │  PR merged   │     │  ArgoCD     │
-                    │  to main     │────▶│  syncs to   │
-                    │              │     │  cluster    │
-                    │  CD: validate│     │             │
-                    │  + sync      │     │  production │
-                    └──────────────┘     └─────────────┘
+                    ┌──────────────────────────────────────┐
+                    │  PR merged to main                   │
+                    │                                      │
+                    │  CD Pipeline:                        │
+                    │   1. Lint (fmt, ansible-lint, sh)    │
+                    │   2. Build (validate, plan, syntax)  │
+                    │   3. Deploy (ArgoCD sync)            │
+                    └──────────────────┬───────────────────┘
+                                       │
+                                       ▼
+                               ┌─────────────┐
+                               │  ArgoCD     │
+                               │  syncs to   │
+                               │  cluster    │
+                               │             │
+                               │  production │
+                               └─────────────┘
 ```
 
 ## Adding a New Service
@@ -97,9 +129,12 @@ To add a new service to the GitOps pipeline:
 ## Troubleshooting
 
 | Symptom | Likely Cause | Fix |
-|---------|-------------|-----|
+|---------|-------------|------|
 | CI fails on Terraform validate | Invalid HCL syntax | Run `terraform validate` locally |
+| CI fails on Terraform format | Inconsistent formatting | Run `terraform fmt -recursive` locally |
 | CI fails on Ansible lint | Ansible best practice violation | Run `ansible-lint` locally and fix warnings |
+| CI fails on ShellCheck | Shell script issue | Run `shellcheck scripts/*.sh` locally |
+| CD fails on Terraform plan | Config compiles but plan fails | Check terraform plan output in CI logs |
 | ArgoCD shows OutOfSync | Cluster state drifted from Git | Click "Sync" in ArgoCD UI or run `argocd app sync argocd-root` |
 | ArgoCD shows Error | Invalid manifest or missing resource | Check ArgoCD UI logs, fix manifest, push fix to `main` |
 | CD workflow skips ArgoCD sync | No webhook or API token configured | This is normal — ArgoCD will auto-sync within polling interval |
