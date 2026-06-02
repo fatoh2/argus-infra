@@ -126,8 +126,6 @@ A comprehensive observability stack provides metrics collection, visualization, 
 - **Loki:** A horizontally-scalable, highly-available log aggregation system. It indexes metadata (labels) rather than full-text, making it cost-effective.
 - **Promtail:** A log collector that runs on each node, shipping container logs to Loki.
 
-
-
 ### Grafana Deployment Details
 
 Grafana is deployed as a standalone ArgoCD application (separate from the `monitoring` app that manages kube-prometheus-stack). The deployment consists of:

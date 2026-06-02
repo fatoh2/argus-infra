@@ -15,7 +15,7 @@ Argus Infra provides a complete, reproducible Kubernetes cluster running on Hetz
 | **Configuration** | Ansible | Install k3s, configure nodes, firewall rules |
 | **GitOps** | ArgoCD | Declarative app deployment, self-healing |
 | **Ingress** | Traefik + cert-manager | HTTP routing, automatic TLS via Let's Encrypt |
-| **Monitoring** | Prometheus + Grafana + Loki | Metrics, dashboards, log aggregation |
+| **Monitoring** | Prometheus + Grafana + Loki | Metrics, dashboards (Node Exporter Full, Cluster Overview), log aggregation |
 | **Secrets** | External Secrets Operator + Doppler | Secure secret injection |
 | **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |
 | **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
@@ -57,7 +57,7 @@ argus-infra/
 │   │   └── config/         # ArgoCD configuration
 │   ├── ingress/            # Traefik, cert-manager, TLS
 │   ├── monitoring/         # Prometheus stack
-│   ├── grafana/            # Grafana dashboards & provisioning
+│   ├── grafana/            # Grafana deployment, dashboards, datasources, ingress
 │   ├── security/           # Security policies
 │   │   ├── network-policies/  # Default deny + explicit allow rules
 │   │   ├── pod-security/      # Pod Security Standards (restricted profile)
@@ -80,7 +80,7 @@ argus-infra/
 
 - **Fully GitOps-driven** — all cluster state defined in Git, ArgoCD syncs automatically
 - **Automatic TLS** — wildcard certificate via Let's Encrypt + cert-manager
-- **Observability out of the box** — Prometheus metrics, Grafana dashboards, Loki logs
+- **Observability out of the box** — Prometheus metrics, Grafana dashboards (Node Exporter Full, Kubernetes Cluster Overview), Loki logs
 - **Secure by default** — External Secrets Operator for secrets, private network for nodes
 - **Network Policies** — default-deny on all namespaces with explicit allow rules for least-privilege pod communication
 - **Pod Security Standards** — restricted profile enforced on all namespaces; workloads configured with `runAsNonRoot`, `readOnlyRootFilesystem`, and dropped capabilities

@@ -265,7 +265,7 @@ After ArgoCD syncs the Grafana application, Grafana will be available at `https:
 
 6.  **Explore starter dashboards**:
     - Go to **Dashboards > Browse**.
-    - You should see the provisioned dashboards (Cluster Overview, etc.).
+    - You should see the provisioned dashboards: **Node Exporter Full** and **Kubernetes Cluster Overview**.
     - Open a dashboard and verify it shows metrics from the cluster.
 
 ### 4.4 Deploy Pod Security Standards
