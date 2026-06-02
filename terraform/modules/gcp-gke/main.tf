@@ -25,6 +25,11 @@ locals {
 }
 
 # ---------------------------------------------------------------------------
+# Data sources
+# ---------------------------------------------------------------------------
+data "google_client_config" "default" {}
+
+# ---------------------------------------------------------------------------
 # GKE Cluster (Autopilot by default)
 # ---------------------------------------------------------------------------
 resource "google_container_cluster" "this" {
@@ -102,6 +107,7 @@ resource "local_file" "kubeconfig" {
     cluster_name     = google_container_cluster.this.name
     cluster_endpoint = google_container_cluster.this.endpoint
     cluster_ca       = google_container_cluster.this.master_auth[0].cluster_ca_certificate
+    access_token     = data.google_client_config.default.access_token
     project_id       = var.project_id
     region           = var.region
   })
