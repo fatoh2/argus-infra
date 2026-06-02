@@ -39,7 +39,9 @@ scripts/
   versions.sh            Print all tool versions for debugging
   run-sanity-checks.sh   Local sanity suite (Terraform, Ansible, ArgoCD)
   argocd-health.sh       ArgoCD app health check
-  cluster-sanity.sh      Full cluster-level sanity checks
+  local-cluster.sh           Spin up local k3d cluster for testing
+  local-cluster-down.sh      Tear down local k3d cluster
+  cluster-sanity.sh          Full cluster-level sanity checks
 .github/workflows/
   sanity-checks.yml      PR-level Terraform + Ansible + ShellCheck + critical files validation
   cd-deploy.yml          CD pipeline (lint → build → ArgoCD sync on merge to main)

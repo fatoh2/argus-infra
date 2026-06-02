@@ -322,3 +322,84 @@ kubectl exec -n kube-system etcd-<node-name> -- etcdctl snapshot save /tmp/etcd-
 ```
 
 To restore, follow the k3s etcd restoration guide.
+
+## 10. Local Cluster Testing with k3d
+
+For development and testing without a production Hetzner Cloud cluster, use the local k3d scripts.
+
+### Prerequisites
+
+The script checks that the following tools are installed before proceeding:
+
+- **k3d** — local Kubernetes cluster (install via `bash scripts/install-tools.sh` or [k3d.io](https://k3d.io))
+- **kubectl** — Kubernetes CLI (install via `bash scripts/install-tools.sh` or [kubernetes.io](https://kubernetes.io/docs/tasks/tools/))
+- **Helm** — Kubernetes package manager (install via `bash scripts/install-tools.sh` or [helm.sh](https://helm.sh/docs/intro/install/))
+
+If any are missing, the script exits with a clear error message and link to installation instructions.
+
+### Spin Up Local Cluster
+
+```bash
+bash scripts/local-cluster.sh
+```
+
+This creates a k3d cluster named `argus-local` with:
+- Port mappings: `8080:80` (HTTP) and `8443:443` (HTTPS) via the k3d loadbalancer
+- **ArgoCD** installed from official manifests in the `argocd` namespace
+- **kube-prometheus-stack** (Prometheus + Grafana + AlertManager) in the `monitoring` namespace
+- **Loki** (log aggregation) in the `logging` namespace
+
+The script is fully idempotent:
+- Namespace creation uses `--dry-run=client -o yaml | kubectl apply -f -` (safe to re-run)
+- Helm repo addition checks if already present before adding (`helm repo list | grep -q`)
+- The script waits up to 300 seconds for all pods to become ready
+
+### Access Local Services
+
+```bash
+# ArgoCD UI
+kubectl port-forward svc/argocd-server -n argocd 8080:80
+# Get initial password:
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
+
+# Grafana
+kubectl port-forward svc/prometheus-grafana -n monitoring 3000:80
+
+# Loki
+kubectl port-forward svc/loki -n logging 3100:3100
+```
+
+### Test Kubernetes Manifests Locally
+
+Before deploying to production, validate manifests against the local cluster:
+
+```bash
+# Apply manifests
+kubectl apply -f k8s/security/network-policies/
+
+# Verify pods come up
+kubectl get pods -A
+
+# Check ArgoCD syncs correctly
+argocd app list
+```
+
+### Tear Down Local Cluster
+
+```bash
+bash scripts/local-cluster-down.sh
+```
+
+This deletes the entire `argus-local` k3d cluster. All resources (pods, volumes, namespaces) are removed.
+
+### Troubleshooting Local Cluster
+
+| Symptom | Likely Cause | Fix |
+|---------|-------------|------|
+| `k3d: command not found` | k3d not installed | Run `bash scripts/install-tools.sh` |
+| `kubectl: command not found` | kubectl not installed | Run `bash scripts/install-tools.sh` |
+| `helm: command not found` | helm not installed | Run `bash scripts/install-tools.sh` |
+| Cluster already exists | Previous cluster not torn down | Run `bash scripts/local-cluster-down.sh` first |
+| ArgoCD pods stuck in Pending | Insufficient resources | Increase Docker resources (min 4GB RAM, 2 CPUs) |
+| Helm install fails | Helm repo not updated | Script handles this with `helm repo update` |
+| Port conflicts | `:8080` or `:8443` already in use | Stop other services using those ports, or modify the script |
