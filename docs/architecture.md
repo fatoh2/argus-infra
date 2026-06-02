@@ -335,6 +335,7 @@ module "argus_vm" {
 | `instance_name` | Instance name |
 | `network_ip` | Private IP address |
 | `nat_ip` | Public IP address (if enabled) |
+| `instance_public_ip` | Alias for `nat_ip` — external public IP (if enabled) |
 | `ssh_command` | Ready-to-use SSH command |
 | `firewall_rule_names` | Created firewall rule names |
 
@@ -379,7 +380,24 @@ Argus Infra includes a Terraform module for deploying a Google Kubernetes Engine
 - `deletion_protection` — Prevent accidental cluster deletion
 - `helm_repos` — Map of Helm repositories to add after cluster creation
 
-**Outputs:** Cluster ID, name, endpoint, CA certificate, kubeconfig path, kubectl configure command, list of Helm repos added.
+**Outputs:**
+
+| Output | Description |
+|---|---|
+| `cluster_id` | GKE cluster ID |
+| `cluster_name` | GKE cluster name |
+| `cluster_endpoint` | Cluster Kubernetes endpoint IP/DNS |
+| `cluster_ca_certificate` | Base64-encoded CA certificate (sensitive) |
+| `cluster_kubernetes_version` | Kubernetes version running on the cluster |
+| `cluster_autopilot_enabled` | Whether Autopilot mode is enabled |
+| `cluster_release_channel` | GKE release channel (REGULAR/RAPID/STABLE) |
+| `kubeconfig_path` | Path to generated kubeconfig file (if `generate_kubeconfig` is enabled) |
+| `kubeconfig_generated` | Whether a kubeconfig file was generated |
+| `kubectl_configure_command` | Command to configure kubectl for this cluster |
+| `network` | VPC network used by the cluster |
+| `subnetwork` | Subnetwork used by the cluster |
+| `node_pool_name` | Primary node pool name (Standard mode only) |
+| `node_pool_node_count` | Primary node pool node count (Standard mode only) |
 
 **Default Helm Repos Added:**
 | Name | URL |
