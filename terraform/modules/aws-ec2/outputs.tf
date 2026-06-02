@@ -64,10 +64,10 @@ output "ssh_command" {
   description = "Ready-to-use SSH command for connecting to the instance."
   value = var.associate_elastic_ip ? (
     "ssh -i <key-path> ${var.ssh_user}@${aws_eip.this[0].public_ip}"
-  ) : (
+    ) : (
     var.enable_public_ip ? (
       "ssh -i <key-path> ${var.ssh_user}@${aws_instance.this.public_ip}"
-    ) : (
+      ) : (
       "Instance has no public IP. Use AWS Systems Manager Session Manager or an SSH bastion."
     )
   )

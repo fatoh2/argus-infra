@@ -38,9 +38,9 @@ provider "aws" {
 module "argus_vm" {
   source = "../../modules/aws-ec2"
 
-  name            = var.name
-  region          = var.region
-  instance_type   = var.instance_type
+  name             = var.name
+  region           = var.region
+  instance_type    = var.instance_type
   root_volume_size = var.root_volume_size
 
   ssh_public_key = var.ssh_public_key
@@ -49,7 +49,7 @@ module "argus_vm" {
   vpc_cidr    = var.vpc_cidr
   subnet_cidr = var.subnet_cidr
 
-  enable_public_ip    = true
+  enable_public_ip     = true
   associate_elastic_ip = true
 
   create_security_group = true

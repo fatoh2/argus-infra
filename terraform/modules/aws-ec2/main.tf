@@ -129,33 +129,36 @@ resource "aws_security_group" "this" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "ssh" {
-  count             = var.create_security_group ? 1 : 0
+  for_each = var.create_security_group ? toset(var.allowed_ssh_cidrs) : toset([])
+
   security_group_id = aws_security_group.this[0].id
 
-  description = "SSH access"
-  cidr_ipv4   = var.allowed_ssh_cidrs[0]
+  description = "SSH access from ${each.value}"
+  cidr_ipv4   = each.value
   from_port   = 22
   to_port     = 22
   ip_protocol = "tcp"
 }
 
 resource "aws_vpc_security_group_ingress_rule" "http" {
-  count             = var.create_security_group ? 1 : 0
+  for_each = var.create_security_group ? toset(var.allowed_http_cidrs) : toset([])
+
   security_group_id = aws_security_group.this[0].id
 
-  description = "HTTP access"
-  cidr_ipv4   = var.allowed_http_cidrs[0]
+  description = "HTTP access from ${each.value}"
+  cidr_ipv4   = each.value
   from_port   = 80
   to_port     = 80
   ip_protocol = "tcp"
 }
 
 resource "aws_vpc_security_group_ingress_rule" "https" {
-  count             = var.create_security_group ? 1 : 0
+  for_each = var.create_security_group ? toset(var.allowed_https_cidrs) : toset([])
+
   security_group_id = aws_security_group.this[0].id
 
-  description = "HTTPS access"
-  cidr_ipv4   = var.allowed_https_cidrs[0]
+  description = "HTTPS access from ${each.value}"
+  cidr_ipv4   = each.value
   from_port   = 443
   to_port     = 443
   ip_protocol = "tcp"
@@ -224,18 +227,18 @@ resource "aws_key_pair" "this" {
 # EC2 Instance
 # ---------------------------------------------------------------------------
 resource "aws_instance" "this" {
-  ami                    = data.aws_ami.ubuntu.id
-  instance_type          = var.instance_type
-  subnet_id              = aws_subnet.public.id
-  vpc_security_group_ids = var.create_security_group ? [aws_security_group.this[0].id] : []
-  key_name               = var.ssh_public_key != null ? aws_key_pair.this[0].key_name : null
-  iam_instance_profile   = var.iam_role_name != null ? aws_iam_instance_profile.this[0].name : null
-  user_data              = base64encode(local.user_data)
+  ami                         = data.aws_ami.ubuntu.id
+  instance_type               = var.instance_type
+  subnet_id                   = aws_subnet.public.id
+  vpc_security_group_ids      = var.create_security_group ? [aws_security_group.this[0].id] : []
+  key_name                    = var.ssh_public_key != null ? aws_key_pair.this[0].key_name : null
+  iam_instance_profile        = var.iam_role_name != null ? aws_iam_instance_profile.this[0].name : null
+  user_data                   = base64encode(local.user_data)
   user_data_replace_on_change = false
 
   root_block_device {
-    volume_size = var.root_volume_size
-    volume_type = var.root_volume_type
+    volume_size           = var.root_volume_size
+    volume_type           = var.root_volume_type
     delete_on_termination = true
 
     tags = merge(local.common_tags, {
@@ -255,8 +258,8 @@ resource "aws_instance" "this" {
 # Elastic IP
 # ---------------------------------------------------------------------------
 resource "aws_eip" "this" {
-  count    = var.associate_elastic_ip ? 1 : 0
-  domain   = "vpc"
+  count  = var.associate_elastic_ip ? 1 : 0
+  domain = "vpc"
 
   tags = merge(local.common_tags, {
     Name = "${var.name}-eip"
