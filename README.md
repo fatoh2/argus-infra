@@ -1,103 +1,105 @@
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |# Argus Infra 🚀
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |[![Sanity Checks](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml)
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |[![Cluster Sanity](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml)
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |**A production-grade Kubernetes homelab platform on Hetzner Cloud** — provisioned with Terraform, configured with Ansible, and managed via GitOps with ArgoCD.
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |## Overview
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |Argus Infra provides a complete, reproducible Kubernetes cluster running on Hetzner Cloud VMs. Everything is defined as code:
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces || Layer | Tool | Purpose |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces ||-------|------|---------|
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces || **Infrastructure** | Terraform | Provision Hetzner VMs, networks, SSH keys |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces || **Configuration** | Ansible | Install k3s, configure nodes, firewall rules |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces || **GitOps** | ArgoCD | Declarative app deployment, self-healing |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces || **Ingress** | Traefik + cert-manager | HTTP routing, automatic TLS via Let's Encrypt |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces || **Monitoring** | Prometheus + Grafana + Loki | Metrics, dashboards, log aggregation |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces || **Secrets** | External Secrets Operator + Doppler | Secure secret injection |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces || **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces || **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |## Quick Start
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |```bash
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |# 1. Provision VMs
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |cd terraform/environments/homelab
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |cp terraform.tfvars.example terraform.tfvars
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |# Edit terraform.tfvars with your Hetzner token
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |terraform init && terraform apply
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |# 2. Install k3s
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |cd ansible
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |cp inventory/homelab.yml.example inventory/homelab.yml
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |# Edit inventory with VM IPs from terraform output
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |ansible-playbook -i inventory/homelab.yml playbooks/site.yml
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |# 3. Bootstrap ArgoCD
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |```
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |See the [full setup guide](docs/setup.md) for detailed instructions.
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |## Repository Structure
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |```
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |argus-infra/
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |├── terraform/              # Hetzner Cloud provisioning
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   └── environments/homelab/
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |├── ansible/                # k3s cluster configuration
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   ├── inventory/
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   ├── playbooks/
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   └── roles/
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |├── k8s/                    # Kubernetes manifests (source of truth)
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   ├── argocd/             # ArgoCD app-of-apps definitions
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   │   ├── apps/           # Individual application manifests
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   │   └── config/         # ArgoCD configuration
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   ├── ingress/            # Traefik, cert-manager, TLS
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   ├── monitoring/         # Prometheus stack
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   ├── grafana/            # Grafana dashboards & provisioning
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   ├── security/           # Security policies
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   │   ├── network-policies/  # Default deny + explicit allow rules
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   │   └── pod-security/      # Pod Security Standards (restricted profile)
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   └── cluster-issuer/     # Let's Encrypt ClusterIssuers
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |├── scripts/                # Operational and CI scripts
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   ├── run-sanity-checks.sh   # Local sanity suite (Terraform, Ansible, ArgoCD)
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   ├── argocd-health.sh       # ArgoCD app health check
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   └── cluster-sanity.sh      # Full cluster-level sanity checks
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |├── docs/                   # Documentation
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   ├── architecture.md     # System architecture
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   ├── setup.md            # Setup guide
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |│   └── adr/                # Architecture Decision Records
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |└── .github/workflows/      # CI pipeline
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |    ├── sanity-checks.yml   # PR-level Terraform + Ansible validation
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |    └── cluster-sanity.yml  # Cluster-level health checks (scheduled)
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |```
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |## Key Features
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |- **Fully GitOps-driven** — all cluster state defined in Git, ArgoCD syncs automatically
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |- **Automatic TLS** — wildcard certificate via Let's Encrypt + cert-manager
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |- **Observability out of the box** — Prometheus metrics, Grafana dashboards, Loki logs
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |- **Secure by default** — External Secrets Operator for secrets, private network for nodes
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |- **Network Policies** — default-deny on all namespaces with explicit allow rules for least-privilege pod communication\n- **Pod Security Standards** — restricted profile enforced on all namespaces; workloads configured with `runAsNonRoot`, `readOnlyRootFilesystem`, and dropped capabilities
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |- **Pod Security Standards** — restricted profile enforced on all namespaces; workloads configured with `runAsNonRoot`, `readOnlyRootFilesystem`, and dropped capabilities
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |- **CI-validated** — Terraform validate + fmt, Ansible syntax check + lint, ShellCheck, critical file checks on every PR
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |- **Cluster health monitoring** — scheduled cluster sanity checks (nodes, pods, ArgoCD apps, ingress) every 6 hours
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |- **Local sanity suite** — run `./scripts/run-sanity-checks.sh` before committing to catch issues early
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |## Architecture
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |See [docs/architecture.md](docs/architecture.md) for a detailed breakdown of all components.
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |## Prerequisites
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |- [Hetzner Cloud](https://www.hetzner.com/cloud) account with API token
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |- [Terraform](https://developer.hashicorp.com/terraform/downloads) v1.0+
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |- [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/index.html) v2.10+
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |- [kubectl](https://kubernetes.io/docs/tasks/tools/)
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |## License
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
-| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |\n| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |MIT
+# Argus Infra 🚀
+
+[![Sanity Checks](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml)
+[![Cluster Sanity](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml)
+
+**A production-grade Kubernetes homelab platform on Hetzner Cloud** — provisioned with Terraform, configured with Ansible, and managed via GitOps with ArgoCD.
+
+## Overview
+
+Argus Infra provides a complete, reproducible Kubernetes cluster running on Hetzner Cloud VMs. Everything is defined as code:
+
+| Layer | Tool | Purpose |
+|-------|------|---------|
+| **Infrastructure** | Terraform | Provision Hetzner VMs, networks, SSH keys |
+| **Configuration** | Ansible | Install k3s, configure nodes, firewall rules |
+| **GitOps** | ArgoCD | Declarative app deployment, self-healing |
+| **Ingress** | Traefik + cert-manager | HTTP routing, automatic TLS via Let's Encrypt |
+| **Monitoring** | Prometheus + Grafana + Loki | Metrics, dashboards, log aggregation |
+| **Secrets** | External Secrets Operator + Doppler | Secure secret injection |
+| **Network Policies** | Kubernetes NetworkPolicies | Least-privilege pod network access (default deny) |
+| **Pod Security** | Kubernetes Pod Security Standards | Restricted profile enforcement on all namespaces |
+
+## Quick Start
+
+```bash
+# 1. Provision VMs
+cd terraform/environments/homelab
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your Hetzner token
+terraform init && terraform apply
+
+# 2. Install k3s
+cd ansible
+cp inventory/homelab.yml.example inventory/homelab.yml
+# Edit inventory with VM IPs from terraform output
+ansible-playbook -i inventory/homelab.yml playbooks/site.yml
+
+# 3. Bootstrap ArgoCD
+kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+```
+
+See the [full setup guide](docs/setup.md) for detailed instructions.
+
+## Repository Structure
+
+```
+argus-infra/
+├── terraform/              # Hetzner Cloud provisioning
+│   └── environments/homelab/
+├── ansible/                # k3s cluster configuration
+│   ├── inventory/
+│   ├── playbooks/
+│   └── roles/
+├── k8s/                    # Kubernetes manifests (source of truth)
+│   ├── argocd/             # ArgoCD app-of-apps definitions
+│   │   ├── apps/           # Individual application manifests
+│   │   └── config/         # ArgoCD configuration
+│   ├── ingress/            # Traefik, cert-manager, TLS
+│   ├── monitoring/         # Prometheus stack
+│   ├── grafana/            # Grafana dashboards & provisioning
+│   ├── security/           # Security policies
+│   │   ├── network-policies/  # Default deny + explicit allow rules
+│   │   ├── pod-security/      # Pod Security Standards (restricted profile)
+│   │   └── rbac/              # Least-privilege ServiceAccounts
+│   └── cluster-issuer/     # Let's Encrypt ClusterIssuers
+├── scripts/                # Operational and CI scripts
+│   ├── run-sanity-checks.sh   # Local sanity suite (Terraform, Ansible, ArgoCD)
+│   ├── argocd-health.sh       # ArgoCD app health check
+│   └── cluster-sanity.sh      # Full cluster-level sanity checks
+├── docs/                   # Documentation
+│   ├── architecture.md     # System architecture
+│   ├── setup.md            # Setup guide
+│   └── adr/                # Architecture Decision Records
+└── .github/workflows/      # CI pipeline
+    ├── sanity-checks.yml   # PR-level Terraform + Ansible validation
+    └── cluster-sanity.yml  # Cluster-level health checks (scheduled)
+```
+
+## Key Features
+
+- **Fully GitOps-driven** — all cluster state defined in Git, ArgoCD syncs automatically
+- **Automatic TLS** — wildcard certificate via Let's Encrypt + cert-manager
+- **Observability out of the box** — Prometheus metrics, Grafana dashboards, Loki logs
+- **Secure by default** — External Secrets Operator for secrets, private network for nodes
+- **Network Policies** — default-deny on all namespaces with explicit allow rules for least-privilege pod communication
+- **Pod Security Standards** — restricted profile enforced on all namespaces; workloads configured with `runAsNonRoot`, `readOnlyRootFilesystem`, and dropped capabilities
+- **Least-Privilege RBAC** — dedicated ServiceAccounts for each service with minimum required permissions; `api-service` has zero k8s API access
+- **CI-validated** — Terraform validate + fmt, Ansible syntax check + lint, ShellCheck, critical file checks on every PR
+- **Cluster health monitoring** — scheduled cluster sanity checks (nodes, pods, ArgoCD apps, ingress) every 6 hours
+- **Local sanity suite** — run `./scripts/run-sanity-checks.sh` before committing to catch issues early
+
+## Architecture
+
+See [docs/architecture.md](docs/architecture.md) for a detailed breakdown of all components.
+
+## Prerequisites
+
+- [Hetzner Cloud](https://www.hetzner.com/cloud) account with API token
+- [Terraform](https://developer.hashicorp.com/terraform/downloads) v1.0+
+- [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/index.html) v2.10+
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+
+## License
+
+MIT
