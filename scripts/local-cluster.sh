@@ -12,7 +12,8 @@ echo "Creating k3d cluster: $CLUSTER_NAME"
 k3d cluster create "$CLUSTER_NAME" --port 8080:80@loadbalancer --port 8443:443@loadbalancer
 
 echo "Exporting kubeconfig..."
-export KUBECONFIG="$(k3d kubeconfig write $CLUSTER_NAME)"
+KUBECONFIG=$(k3d kubeconfig write "$CLUSTER_NAME")
+export KUBECONFIG
 echo "KUBECONFIG for $CLUSTER_NAME is set. You can also run: export KUBECONFIG=\"$(k3d kubeconfig write $CLUSTER_NAME)\""
 
 echo "Installing ArgoCD..."
