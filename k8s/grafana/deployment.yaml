@@ -24,9 +24,22 @@ spec:
           type: RuntimeDefault
       containers:
       - name: grafana
-        image: grafana/grafana:latest
+        image: grafana/grafana:11.0.0
         ports:
         - containerPort: 3000
+        env:
+        - name: GF_SECURITY_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              name: grafana-admin-credentials
+              key: admin-user
+              optional: false
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-admin-credentials
+              key: admin-password
+              optional: false
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
@@ -46,7 +59,8 @@ spec:
           mountPath: /tmp
       volumes:
       - name: grafana-persistent
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: grafana-data
       - name: grafana-config
         configMap:
           name: grafana-datasource-config
