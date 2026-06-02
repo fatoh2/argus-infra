@@ -83,7 +83,7 @@ ssh argus@$(terraform output -raw public_ip)
 ssh argus@$(terraform output -raw public_ip) "docker --version && docker compose version"
 ```
 
-See the [GCP module documentation](docs/architecture.md#9-gcp-compute-engine-module) for full details.
+See the [GCP module documentation](docs/architecture.md#15-gcp-compute-engine-module) for full details.
 
 ## Makefile Targets
 

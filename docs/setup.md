@@ -362,4 +362,4 @@ terraform destroy
 
 ### Full Reference
 
-See the [architecture documentation](architecture.md#9-gcp-compute-engine-module) for the complete module reference (all variables, outputs, and configuration options). See the [runbooks](runbooks.md#gcp-vm-deployment) for operational procedures.
+See the [architecture documentation](architecture.md#15-gcp-compute-engine-module) for the complete module reference (all variables, outputs, and configuration options). See the [runbooks](runbooks.md#gcp-vm-deployment) for operational procedures.
