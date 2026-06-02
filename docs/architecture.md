@@ -20,7 +20,6 @@ Argus Infra is a fully GitOps-driven Kubernetes homelab platform running on Hetz
 Argus Infra leverages Terraform (or OpenTofu) to provision the underlying virtual machine infrastructure on Hetzner Cloud. This ensures that the infrastructure is defined as code, enabling reproducibility, version control, and automated deployment.
 
 ### Key Components:
-- **ServiceMonitors:** Custom resources that Prometheus uses to discover and scrape metrics from Kubernetes services. PR #57 introduced ServiceMonitors for `argus-monitor` services (API, Chain Indexer, Solana Adapter) to automatically collect their metrics.
 - **Hetzner Cloud Project:** The entire infrastructure resides within a dedicated Hetzner Cloud project.
 - **Private Network:** A dedicated private network (`10.0.0.0/16`) and subnet (`10.0.1.0/24`) are created to facilitate secure communication between Kubernetes nodes, isolated from the public internet. This network is crucial for stable internal IP addressing for Kubernetes components.
 - **Virtual Machines:**
@@ -33,7 +32,6 @@ Argus Infra leverages Terraform (or OpenTofu) to provision the underlying virtua
 k3s is chosen as the Kubernetes distribution for its lightweight nature, ease of installation, and suitability for homelab and edge environments. It provides a fully compliant Kubernetes API with a reduced footprint.
 
 ### Key Components:
-- **ServiceMonitors:** Custom resources that Prometheus uses to discover and scrape metrics from Kubernetes services. PR #57 introduced ServiceMonitors for `argus-monitor` services (API, Chain Indexer, Solana Adapter) to automatically collect their metrics.
 - **k3s Server:** Runs on the `k8s-control` node, encompassing:
   - **API Server:** Exposes the Kubernetes API, acting as the front-end for the control plane.
   - **Controller Manager:** Runs controller processes, which watch the shared state of the cluster through the API server and make changes attempting to move the current state towards the desired state.
@@ -117,119 +115,17 @@ Argus Infra uses Traefik as its ingress controller, replacing the default k3s Tr
 
 ## 8. Secrets Management (External Secrets Operator + Doppler)
 
-Secrets are managed securely using **External Secrets Operator (ESO)** with **Doppler** as the backend.
+Secrets are managed securely using External Secrets Operator (ESO) with Doppler as the backend.
 
-### Architecture
+### External Secrets Operator
+- **Deployment:** Deployed via Helm chart in the `security` namespace.
+- **Secret Stores:** Configured to pull secrets from Doppler projects.
+- **External Secrets:** Define which secrets to sync from Doppler into Kubernetes Secrets.
 
-```
-Doppler (source of truth)
-    │
-    ▼
-External Secrets Operator (syncs secrets into the cluster)
-    │
-    ▼
-Kubernetes Secrets (consumed by pods)
-```
-
-- **Doppler** is the single source of truth for all secrets (API keys, database URLs, tokens).
-- **External Secrets Operator** runs in the `external-secrets-operator` namespace and syncs secrets from Doppler into Kubernetes `Secret` objects.
-- **SecretStore** resources define how ESO authenticates to Doppler.
-- **ExternalSecret** resources define which Doppler secrets to sync and where to store them.
-
-### Deployment
-
-ESO is deployed via ArgoCD (app-of-apps pattern). The ArgoCD application at `k8s/argocd/apps/external-secrets.yaml` points to `k8s/external-secrets/`, which contains:
-
-- **`helm-repository.yaml`** — Flux HelmRepository pointing to `https://charts.external-secrets.io`
-- **`helm-release.yaml`** — Flux HelmRelease deploying ESO v0.9.x with CRDs
-- **`secretstore.yaml`** — A `SecretStore` resource named `doppler-backend` in the `default` namespace
-- **`example-external-secret.yaml`** — An example `ExternalSecret` syncing `DATABASE_URL`, `REDIS_URL`, and `API_KEY`
-- **`doppler-auth-secret.yaml`** — A placeholder Kubernetes `Secret` for the Doppler service token (token must be applied manually — never committed to git)
-- **`kustomization.yaml`** — Kustomize resources list
-
-### Doppler Authentication
-
-ESO authenticates to Doppler using a service token stored in a Kubernetes Secret:
-
-```bash
-kubectl create secret generic doppler-auth   --namespace external-secrets-operator   --from-literal=token='dp.st.your_token_here'   --dry-run=client -o yaml | kubectl apply -f -
-```
-
-> **Never** commit the actual token to the repository. The file `k8s/external-secrets/doppler-auth-secret.yaml` contains a placeholder only.
-
-### SecretStore
-
-The `SecretStore` resource (`k8s/external-secrets/secretstore.yaml`) configures ESO to use Doppler as the provider:
-
-```yaml
-apiVersion: external-secrets.io/v1beta1
-kind: SecretStore
-metadata:
-  name: doppler-backend
-  namespace: default
-spec:
-  provider:
-    doppler:
-      auth:
-        secretRef:
-          dopplerToken:
-            name: doppler-auth
-            key: token
-```
-
-### ExternalSecret Example
-
-An `ExternalSecret` defines which Doppler secrets to sync and where to store them:
-
-```yaml
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: example-app-secret
-  namespace: default
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: doppler-backend
-    kind: SecretStore
-  target:
-    name: example-app-secret
-    creationPolicy: Owner
-  data:
-    - secretKey: DATABASE_URL
-      remoteRef:
-        key: DATABASE_URL
-    - secretKey: REDIS_URL
-      remoteRef:
-        key: REDIS_URL
-    - secretKey: API_KEY
-      remoteRef:
-        key: API_KEY
-```
-
-### Verification
-
-```bash
-# Check ESO pods are running
-kubectl get pods -n external-secrets-operator
-
-# Check SecretStore status
-kubectl get secretstore -n default doppler-backend -o wide
-
-# Check ExternalSecret status
-kubectl get externalsecret -n default example-app-secret -o wide
-
-# Verify the synced secret exists
-kubectl get secret -n default example-app-secret
-```
-
-### Security Notes
-
-- Doppler service tokens are stored as Kubernetes Secrets in the `external-secrets-operator` namespace
-- The `doppler-auth` secret is **never** committed to git with a real token
-- ExternalSecrets use `creationPolicy: Owner` so ESO manages the lifecycle
-- Secrets are refreshed every hour (`refreshInterval: 1h`)
-- ESO RBAC is scoped to only manage secrets in namespaces where ExternalSecrets are defined
+### Doppler
+- **Backend:** Doppler serves as the central secrets management platform.
+- **Projects:** Each application (e.g., `argus-monitor`, `argus-ai`) has its own Doppler project.
+- **Integration:** ESO authenticates with Doppler using a service token stored in a Kubernetes Secret.
 
 See [docs/secrets.md](secrets.md) for the full setup guide, verification steps, and troubleshooting.
 
@@ -260,7 +156,7 @@ Security is implemented at multiple layers to ensure least-privilege access and 
 Argus Infra uses a two-tier CI/CD approach with GitHub Actions:
 
 1. **CI (Continuous Integration)** — runs on every PR to `develop` via `.github/workflows/sanity-checks.yml`
-2. **CD (Continuous Deployment)** — runs on every merge to `main` via `.github/workflows/cd-deploy.yml`
+2. **CD (Continuous Deployment)** — runs on infrastructure-relevant merges to `main` (path-filtered) via `.github/workflows/cd-deploy.yml`
 
 The pipeline is designed to catch issues early and ensure cluster reliability.
 
@@ -301,7 +197,7 @@ See [docs/cicd.md](cicd.md) for full pipeline documentation, including webhook s
 
 ### Cluster Health Monitoring
 
-The `cluster-sanity.yml` workflow runs on a scheduled basis (every 6 hours) to perform cluster-level health checks. It uses a `gate` job that conditionally enables the checks based on the `CLUSTER_SANITY_ENABLED` repository variable — this ensures the cron job always succeeds even when the cluster is not yet configured.
+The `cluster-sanity.yml` workflow runs on a scheduled basis (every 6 hours) to perform cluster-level health checks:
 
 | Check | What it validates |
 |-------|-------------------|

@@ -2,9 +2,9 @@
 
 Argus Infra uses a three-stage CI/CD pipeline:
 
-1. **Lint** — code quality checks (terraform fmt, ansible-lint, shellcheck)
-2. **Build** — infrastructure compilation checks (terraform validate + plan, ansible syntax, critical files)
-3. **Deploy** — ArgoCD GitOps sync
+1. **Lint** — code quality checks (terraform fmt, ansible-lint, shellcheck, critical file checks)
+2. **Build** — infrastructure compilation checks (terraform validate + plan, guarded to skip gracefully when directories or secrets are absent)
+3. **Deploy** — ArgoCD GitOps sync (path-filtered; docs-only pushes are skipped automatically)
 
 ## CI: Pull Request Validation
 
@@ -56,21 +56,21 @@ Runs three sequential stages:
 | Terraform Validate | `terraform validate` confirms HCL syntax is correct | Skips if `terraform/environments/homelab` directory doesn't exist |
 | Terraform Plan | Dry-run plan to verify configuration compiles end-to-end | Skips if `terraform/environments/homelab` doesn't exist; also skips gracefully if `HCLOUD_TOKEN` secret is not configured (prints a message and exits 0) |
 
-> **Note:** The Terraform plan step no longer requires `HCLOUD_TOKEN` to be set. If the token is absent, it prints a warning and exits successfully. This allows the workflow to pass even before cluster secrets are configured.
+> **Note:** The Terraform plan step no longer requires `HCLOUD_TOKEN` to be set. If the token is absent, it prints a warning and exits successfully. This allows the workflow to pass even when cloud credentials aren't configured yet (e.g., during initial repo setup).
 
-### Stage 3: Deploy (placeholder)
+### Stage 3: Deploy
 
-| Step | What it does |
-|------|--------------|
-| Deploy placeholder | Prints a message explaining that `KUBECONFIG`, `ARGOCD_SERVER`, and `ARGOCD_TOKEN` must be set in repo secrets to enable actual deployment |
+| Step | What it does | Graceful skip |
+|------|--------------|---------------|
+| Deploy | Placeholder step that prints deployment instructions | Skips gracefully until `KUBECONFIG`, `ARGOCD_SERVER`, and `ARGOCD_TOKEN` are configured |
 
-> **Note:** The deploy stage is currently a placeholder that gracefully skips until cluster secrets are configured. Once `KUBECONFIG`, `ARGOCD_SERVER`, and `ARGOCD_TOKEN` are set as repository secrets, this stage can be updated to trigger an ArgoCD sync.
+> **Note:** The deploy stage is currently a placeholder. Once cluster secrets are configured, this stage will trigger ArgoCD sync automatically. Until then, it prints instructions and exits successfully.
 
 ### How ArgoCD GitOps Works
 
 ArgoCD is configured to watch the `main` branch of this repository. When a PR merges to `main`:
 
-1. GitHub Actions runs the CD workflow (lint → build → deploy) — only if the merge touches infrastructure paths
+1. GitHub Actions runs the CD workflow (lint → build → deploy) — only if the push touches infrastructure paths
 2. ArgoCD detects the change in Git (either via webhook or its 3-minute polling interval)
 3. ArgoCD syncs the cluster state to match the manifests in `main`
 4. ArgoCD reports sync status (Synced/OutOfSync/Error) in the ArgoCD UI
@@ -112,13 +112,13 @@ This is optional — ArgoCD will auto-sync within its default 3-minute polling i
                            ▼
                     ┌──────────────────────────────────────────┐
                     │  PR merged to main                       │
-                    │  (only if infra paths changed)           │
                     │                                          │
                     │  CD Pipeline (path-filtered):            │
-                    │   1. Lint (fmt, ansible-lint, sh,        │
-                    │      critical files)                     │
+                    │   1. Lint (fmt, ansible-lint, sh, crit)  │
                     │   2. Build (validate, plan — guarded)    │
-                    │   3. Deploy (placeholder)                │
+                    │   3. Deploy (placeholder until secrets)  │
+                    │                                          │
+                    │  Docs-only pushes are skipped entirely   │
                     └──────────────────┬───────────────────────┘
                                        │
                                        ▼
@@ -148,61 +148,8 @@ To add a new service to the GitOps pipeline:
 | CI fails on Terraform format | Inconsistent formatting | Run `terraform fmt -recursive` locally |
 | CI fails on Ansible lint | Ansible best practice violation | Run `ansible-lint` locally and fix warnings |
 | CI fails on ShellCheck | Shell script issue | Run `shellcheck scripts/*.sh` locally |
-| CD not triggered after merge | Push was docs-only | Check if the merge touched paths under `terraform/`, `ansible/`, `k8s/`, `scripts/`, or `.github/workflows/cd-deploy.yml` |
-| CD fails on Terraform plan | Config compiles but plan fails | Check terraform plan output in CI logs; ensure `HCLOUD_TOKEN` is set if you want a real plan |
-| CD deploy stage does nothing | Cluster secrets not configured | Set `KUBECONFIG`, `ARGOCD_SERVER`, and `ARGOCD_TOKEN` in repo secrets |
+| CD fails on Terraform plan | Config compiles but plan fails | Check terraform plan output in CI logs |
+| CD workflow doesn't run on push | Push was docs-only | Check if changed files match path filter (`terraform/**`, `ansible/**`, `k8s/**`, `scripts/**`, `.github/workflows/cd-deploy.yml`) |
+| CD workflow passes but nothing deploys | Cluster secrets not configured | Set `KUBECONFIG`, `ARGOCD_SERVER`, and `ARGOCD_TOKEN` as repository secrets |
 | ArgoCD shows OutOfSync | Cluster state drifted from Git | Click "Sync" in ArgoCD UI or run `argocd app sync argocd-root` |
 | ArgoCD shows Error | Invalid manifest or missing resource | Check ArgoCD UI for detailed error message |
-
-## Pipeline Diagram
-
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│  Developer   │     │  GitHub PR   │     │  ArgoCD     │
-│  pushes to   │────▶│  to develop  │────▶│  watches    │
-│  feature/    │     │              │     │  develop    │
-│  branch      │     │  CI: sanity  │     │  (preview)  │
-└─────────────┘     │  checks      │     └─────────────┘
-                    └──────┬───────┘
-                           │
-                           ▼
-                    ┌──────────────────────────────────────┐
-                    │  PR merged to main                   │
-                    │                                      │
-                    │  CD Pipeline:                        │
-                    │   1. Lint (fmt, ansible-lint, sh)    │
-                    │   2. Build (validate, plan, syntax)  │
-                    │   3. Deploy (ArgoCD sync)            │
-                    └──────────────────┬───────────────────┘
-                                       │
-                                       ▼
-                               ┌─────────────┐
-                               │  ArgoCD     │
-                               │  syncs to   │
-                               │  cluster    │
-                               │             │
-                               │  production │
-                               └─────────────┘
-```
-
-## Adding a New Service
-
-To add a new service to the GitOps pipeline:
-
-1. Create Kubernetes manifests in `k8s/<service>/`
-2. Add an ArgoCD Application manifest in `k8s/argocd/apps/`
-3. Open a PR to `develop` — CI validates
-4. Merge to `main` — CD deploys via ArgoCD
-
-## Troubleshooting
-
-| Symptom | Likely Cause | Fix |
-|---------|-------------|------|
-| CI fails on Terraform validate | Invalid HCL syntax | Run `terraform validate` locally |
-| CI fails on Terraform format | Inconsistent formatting | Run `terraform fmt -recursive` locally |
-| CI fails on Ansible lint | Ansible best practice violation | Run `ansible-lint` locally and fix warnings |
-| CI fails on ShellCheck | Shell script issue | Run `shellcheck scripts/*.sh` locally |
-| CD fails on Terraform plan | Config compiles but plan fails | Check terraform plan output in CI logs |
-| ArgoCD shows OutOfSync | Cluster state drifted from Git | Click "Sync" in ArgoCD UI or run `argocd app sync argocd-root` |
-| ArgoCD shows Error | Invalid manifest or missing resource | Check ArgoCD UI logs, fix manifest, push fix to `main` |
-| CD workflow skips ArgoCD sync | No webhook or API token configured | This is normal — ArgoCD will auto-sync within polling interval |
