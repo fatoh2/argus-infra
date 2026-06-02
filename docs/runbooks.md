@@ -680,3 +680,69 @@ After the VM boots (wait ~2 minutes), verify Docker is running:
 ```bash
 ssh argus@<public-ip> "docker --version && docker compose version"
 ```
+
+## GCP GKE Deployment
+
+### Provision a GKE Cluster on GCP
+
+```bash
+cd terraform/environments/gcp-gke
+
+# 1. Configure
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your GCP project ID
+
+# 2. Initialize
+terraform init
+
+# 3. Preview
+terraform plan
+
+# 4. Apply
+terraform apply
+
+# 5. Configure kubectl
+$(terraform output -raw kubectl_configure_command)
+
+# 6. Verify
+kubectl get nodes
+```
+
+### Destroy the GKE Cluster
+
+```bash
+cd terraform/environments/gcp-gke
+terraform destroy
+```
+
+> **Warning:** `terraform destroy` will delete the GKE cluster and all associated resources (nodes, disks, load balancers). Persistent volumes and their data will be lost unless backed up.
+
+### Adding Custom Helm Repos
+
+The GKE module accepts a `helm_repos` variable to add additional Helm repositories:
+
+```hcl
+module "argus_gke" {
+  source = "../../modules/gcp-gke"
+
+  project_id = var.project_id
+  region     = var.region
+
+  helm_repos = {
+    "bitnami" = "https://charts.bitnami.com/bitnami"
+    "ingress-nginx" = "https://kubernetes.github.io/ingress-nginx"
+  }
+}
+```
+
+### Switching Between Autopilot and Standard
+
+By default, the cluster uses Autopilot mode (`enable_autopilot = true`). To use Standard mode:
+
+```hcl
+enable_autopilot   = false
+num_nodes          = 3
+node_machine_type  = "e2-standard-4"
+```
+
+> **Note:** Autopilot and Standard are mutually exclusive. You cannot switch a cluster from Autopilot to Standard (or vice versa) after creation — you must destroy and recreate.
