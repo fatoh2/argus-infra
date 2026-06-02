@@ -11,10 +11,9 @@ command -v helm >/dev/null 2>&1 || { echo "Error: helm not found. Install from h
 echo "Creating k3d cluster: $CLUSTER_NAME"
 k3d cluster create "$CLUSTER_NAME" --port 8080:80@loadbalancer --port 8443:443@loadbalancer
 
-echo ""
-echo "To use this cluster, run:"
-echo "  export KUBECONFIG=\"\$(k3d kubeconfig write $CLUSTER_NAME)\""
-echo ""
+echo "Exporting kubeconfig..."
+export KUBECONFIG="$(k3d kubeconfig write $CLUSTER_NAME)"
+echo "KUBECONFIG for $CLUSTER_NAME is set. You can also run: export KUBECONFIG=\"$(k3d kubeconfig write $CLUSTER_NAME)\""
 
 echo "Installing ArgoCD..."
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
@@ -27,11 +26,13 @@ kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-applicat
 
 echo "Installing kube-prometheus-stack..."
 helm repo list | grep -q prometheus-community || helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
 kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
 helm install prometheus prometheus-community/kube-prometheus-stack -n monitoring --wait
 
 echo "Installing Loki..."
 helm repo list | grep -q grafana || helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
 kubectl create namespace logging --dry-run=client -o yaml | kubectl apply -f -
 helm install loki grafana/loki -n logging --wait
 
