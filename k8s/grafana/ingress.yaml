@@ -3,6 +3,9 @@ kind: IngressRoute
 metadata:
   name: grafana
   namespace: monitoring
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   entryPoints:
     - websecure
@@ -13,4 +16,4 @@ spec:
     - name: grafana
       port: 80
   tls:
-    certResolver: letsencrypt
+    secretName: grafana-tls
