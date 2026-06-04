@@ -94,11 +94,11 @@ if [[ "$OS_TYPE" == "linux" || "$OS_TYPE" == "wsl2" ]]; then
   fi
 
   # Explicit error check for apt-get update (Bug 5 fix)
-  if ! quiet sudo apt-get update -qq; then
+  if ! quiet sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq; then
     warn "apt-get update failed — installs may fail. Try: sudo apt-get update manually"
   fi
 
-  quiet sudo apt-get install -y -qq \
+  quiet sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     curl wget git jq unzip build-essential \
     software-properties-common gnupg ca-certificates \
     python3 python3-venv python3-pip \
@@ -194,7 +194,7 @@ if command -v ansible &>/dev/null; then
 else
   if [[ "$OS_TYPE" == "linux" || "$OS_TYPE" == "wsl2" ]]; then
     info "Installing Ansible via apt..."
-    if quiet sudo apt-get install -y -qq ansible-core; then
+    if quiet sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core; then
       ok "Ansible installed"
     else
       # Fallback to pip3 if apt fails (Bug 4 fix)
