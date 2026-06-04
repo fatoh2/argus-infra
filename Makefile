@@ -21,17 +21,17 @@ help:
 	@echo "  make check-versions  - Print installed tool versions"
 	@echo ""
 
-install-tools:
+install-tools: ## Install required CLI tools (Terraform, kubectl, Helm, k3d, kubeseal, etc.)
 	@echo "Installing required CLI tools..."
-	./scripts/install-tools.sh
+	@bash scripts/install-tools.sh
 
-local-up:
+local-up: ## Spin up local k3d cluster with ArgoCD, Prometheus, Loki
 	@echo "Spinning up local k3d cluster..."
-	./scripts/local-cluster.sh
+	@bash scripts/local-cluster.sh
 
-local-down:
+local-down: ## Tear down local k3d cluster
 	@echo "Tearing down local k3d cluster..."
-	./scripts/local-cluster-down.sh
+	@bash scripts/local-cluster-down.sh
 
 lint:
 	@echo "Running linters..."

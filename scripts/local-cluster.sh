@@ -78,22 +78,46 @@ kubectl rollout status deployment/coredns -n kube-system --timeout=300s
 
 ok "Cluster is ready"
 
-# Install ArgoCD via Helm (avoids annotation metadata size issues with kubectl apply)
+# Install ArgoCD via Helm
 log "Installing ArgoCD..."
 helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true
 helm repo update >/dev/null 2>&1 || true
 
+# ArgoCD v2.8+ requires password to be bcrypt-hashed — plain text does not work
+# Generate bcrypt hash of "admin" using python3 (available on Ubuntu/macOS by default)
+ARGOCD_ADMIN_PASS="admin"
+ARGOCD_ADMIN_HASH=$(python3 -c "import bcrypt; print(bcrypt.hashpw(b'${ARGOCD_ADMIN_PASS}', bcrypt.gensalt(10)).decode())" 2>/dev/null)
+if [ -z "$ARGOCD_ADMIN_HASH" ]; then
+    # bcrypt not available — install it then retry
+    pip3 install bcrypt --quiet 2>/dev/null || true
+    ARGOCD_ADMIN_HASH=$(python3 -c "import bcrypt; print(bcrypt.hashpw(b'${ARGOCD_ADMIN_PASS}', bcrypt.gensalt(10)).decode())" 2>/dev/null)
+fi
+if [ -z "$ARGOCD_ADMIN_HASH" ]; then
+    # Last resort: use a pre-computed bcrypt hash for "admin" (cost 10)
+    ARGOCD_ADMIN_HASH='$2a$10$rRyBsGAAe/EFnxQcpGIHOe2.e6FFdS7I4j9k.bGG5MaJLrBQNb3hy'
+fi
+
+# Write Helm values to a temp file (avoids heredoc issues in different shells)
+cat > /tmp/argocd-values.yaml <<YAML
+configs:
+  secret:
+    argocdServerAdminPassword: "${ARGOCD_ADMIN_HASH}"
+    argocdServerAdminPasswordMtime: "$(date +%FT%T%Z)"
+server:
+  insecure: true
+YAML
+
 if helm install argocd argo/argo-cd \
   --namespace argocd \
   --create-namespace \
-  --set configs.secret.argocdServerAdminPassword=admin \
-  --set server.insecure=true \
+  --values /tmp/argocd-values.yaml \
   >/dev/null 2>&1; then
-    # Wait for ArgoCD server to be ready
     log "Waiting for ArgoCD to be ready (this may take a minute)..."
     kubectl wait -n argocd --for=condition=available --timeout=300s deployment/argocd-server >/dev/null 2>&1 || true
-    ok "ArgoCD installed"
+    rm -f /tmp/argocd-values.yaml
+    ok "ArgoCD installed (admin / ${ARGOCD_ADMIN_PASS})"
 else
+    rm -f /tmp/argocd-values.yaml
     warn "ArgoCD installation failed (Helm install issue - this is optional)"
 fi
 
@@ -102,10 +126,9 @@ if command -v helm &>/dev/null; then
     log "Installing Prometheus..."
     helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
     helm repo update 2>/dev/null || true
-    helm install prometheus prometheus-community/kube-prometheus-stack \
-      --namespace monitoring \
-      --create-namespace \
-      --values=- 2>/dev/null <<EOF || warn "Prometheus installation skipped (optional)"
+
+    # Write to temp file — avoids heredoc-to-stdin issues in Git Bash / non-bash shells
+    cat > /tmp/prometheus-values.yaml <<'YAML'
 prometheus:
   prometheusSpec:
     retention: 24h
@@ -121,19 +144,25 @@ grafana:
     requests:
       cpu: 50m
       memory: 256Mi
-EOF
-    if [ $? -eq 0 ]; then
-        ok "Prometheus installed"
-    fi
+YAML
 
-    # Install Loki (optional - cluster works without it)
+    if helm install prometheus prometheus-community/kube-prometheus-stack \
+      --namespace monitoring \
+      --create-namespace \
+      --values /tmp/prometheus-values.yaml \
+      >/dev/null 2>&1; then
+        ok "Prometheus installed"
+    else
+        warn "Prometheus installation skipped (optional)"
+    fi
+    rm -f /tmp/prometheus-values.yaml
+
+    # Install Loki (optional)
     log "Installing Loki..."
     helm repo add grafana https://grafana.github.io/helm-charts 2>/dev/null || true
     helm repo update 2>/dev/null || true
-    helm install loki grafana/loki-stack \
-      --namespace logging \
-      --create-namespace \
-      --values=- 2>/dev/null <<EOF || warn "Loki installation skipped (optional)"
+
+    cat > /tmp/loki-values.yaml <<'YAML'
 loki:
   persistence:
     enabled: false
@@ -143,13 +172,20 @@ loki:
       memory: 128Mi
 promtail:
   enabled: true
-EOF
-    if [ $? -eq 0 ]; then
+YAML
+
+    if helm install loki grafana/loki-stack \
+      --namespace logging \
+      --create-namespace \
+      --values /tmp/loki-values.yaml \
+      >/dev/null 2>&1; then
         ok "Loki installed"
+    else
+        warn "Loki installation skipped (optional)"
     fi
+    rm -f /tmp/loki-values.yaml
 else
     warn "Helm not found - skipping Prometheus and Loki installation"
-    warn "You can install them later with: helm repo add ... && helm install ..."
 fi
 
 echo ""

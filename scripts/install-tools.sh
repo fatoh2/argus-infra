@@ -9,30 +9,58 @@ set +e
 TOOLS_INSTALLED=0
 TOOLS_SKIPPED=0
 TOOLS_FAILED=0
+
+# ── OS detection ─────────────────────────────────────────────────────────────
+detect_os() {
+    if [[ "${OS:-}" == "Windows_NT" || "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+        echo "windows"
+    elif grep -qi "microsoft" /proc/version 2>/dev/null; then
+        echo "wsl2"
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "macos"
+    else
+        echo "linux"
+    fi
+}
+DETECTED_OS=$(detect_os)
 IS_WINDOWS=false
+[[ "$DETECTED_OS" == "windows" ]] && IS_WINDOWS=true
 
-# Detect Windows
-if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
-    IS_WINDOWS=true
-fi
-
-log() { echo "→ $1"; }
-ok() { echo "✓ $1"; TOOLS_INSTALLED=$((TOOLS_INSTALLED+1)); }
+log()  { echo "→ $1"; }
+ok()   { echo "✓ $1"; TOOLS_INSTALLED=$((TOOLS_INSTALLED+1)); }
 skip() { echo "⊘ $1 (skipped)"; TOOLS_SKIPPED=$((TOOLS_SKIPPED+1)); }
 fail() { echo "✗ $1"; TOOLS_FAILED=$((TOOLS_FAILED+1)); }
 
-# Ensure build-essential and curl are installed first
-log "Installing Argus Infra CLI tools..."
+# safe_install: cross-platform binary install (replaces sudo install -o root -g root which breaks on macOS)
+safe_install() {
+    local src=$1 dst=$2
+    sudo mv "$src" "$dst" && sudo chmod 755 "$dst"
+}
+
+log "Installing Argus Infra CLI tools (OS: $DETECTED_OS)..."
 echo ""
 
-# Install dependencies first
-log "Checking for dependencies..."
+# ── Bootstrap: make + core utilities ─────────────────────────────────────────
+# make must exist before anything else — install it silently if missing
+if ! command -v make &>/dev/null && command -v apt-get &>/dev/null; then
+    log "Installing make (required for all Makefile targets)..."
+    sudo apt-get update -qq >/dev/null 2>&1 || true
+    sudo apt-get install -y -qq make >/dev/null 2>&1 && ok "make" || fail "make"
+elif ! command -v make &>/dev/null && [[ "$DETECTED_OS" == "macos" ]]; then
+    log "Installing make via Xcode CLI tools..."
+    xcode-select --install 2>/dev/null || true
+fi
+
+# Install other core dependencies (unzip, wget, curl, jq)
 if command -v apt-get &>/dev/null; then
-    # Check if we need to install essentials
-    if ! command -v unzip &>/dev/null || ! command -v wget &>/dev/null || ! command -v curl &>/dev/null; then
-        log "Installing build tools (unzip, wget, curl)..."
-        sudo apt-get update >/dev/null 2>&1 || true
-        sudo apt-get install -y unzip wget curl >/dev/null 2>&1 || true
+    MISSING_DEPS=""
+    for dep in unzip wget curl jq; do
+        command -v "$dep" &>/dev/null || MISSING_DEPS="$MISSING_DEPS $dep"
+    done
+    if [ -n "$MISSING_DEPS" ]; then
+        log "Installing core dependencies:$MISSING_DEPS"
+        sudo apt-get update -qq >/dev/null 2>&1 || { log "WARNING: apt-get update failed — installs may fail"; }
+        sudo apt-get install -y -qq $MISSING_DEPS >/dev/null 2>&1 || true
     fi
 fi
 echo ""
@@ -70,9 +98,11 @@ fi
 # kubectl
 if ! command -v kubectl &>/dev/null; then
     log "Installing kubectl..."
-    if [[ "$OSTYPE" == "linux-gnu"* ]] || [[ "$OSTYPE" == "darwin"* ]]; then
-        curl -sL https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/$(uname -s | tr '[:upper:]' '[:lower:]')/amd64/kubectl -o /tmp/kubectl
-        sudo install -o root -g root -m 0755 /tmp/kubectl /usr/local/bin/kubectl && ok "kubectl" || fail "kubectl"
+    if [[ "$DETECTED_OS" == "linux" || "$DETECTED_OS" == "wsl2" || "$DETECTED_OS" == "macos" ]]; then
+        KUBE_VER=$(curl -Ls https://dl.k8s.io/release/stable.txt)
+        OS_NAME=$(uname -s | tr '[:upper:]' '[:lower:]')
+        curl -sL "https://dl.k8s.io/release/${KUBE_VER}/bin/${OS_NAME}/amd64/kubectl" -o /tmp/kubectl
+        safe_install /tmp/kubectl /usr/local/bin/kubectl && ok "kubectl" || fail "kubectl"
     elif [ "$IS_WINDOWS" = true ]; then
         skip "kubectl (use chocolatey: choco install kubernetes-cli)"
     fi
@@ -157,22 +187,28 @@ if [ "$IS_WINDOWS" = true ]; then
 else
     if ! command -v kubeseal &>/dev/null; then
         log "Installing kubeseal..."
-        KUBESEAL_VERSION=$(curl -s https://api.github.com/repos/bitnami-labs/sealed-secrets/releases/latest 2>/dev/null | grep tag_name | cut -d '"' -f 4)
-        if [ -z "$KUBESEAL_VERSION" ]; then
-            fail "kubeseal (cannot determine latest version)"
-        else
-            KUBESEAL_URL="https://github.com/bitnami-labs/sealed-secrets/releases/download/${KUBESEAL_VERSION}/kubeseal-$(uname -s | tr '[:upper:]' '[:lower:]')-amd64.tar.gz"
-            # Download to temp file first
-            if wget -q "$KUBESEAL_URL" -O /tmp/kubeseal.tar.gz 2>/dev/null; then
-                if tar xzf /tmp/kubeseal.tar.gz -C /tmp/ 2>/dev/null && [ -f /tmp/kubeseal ]; then
-                    sudo install -o root -g root -m 0755 /tmp/kubeseal /usr/local/bin/kubeseal >/dev/null 2>&1 && \
-                    rm -f /tmp/kubeseal /tmp/kubeseal.tar.gz && ok "kubeseal" || fail "kubeseal (install failed)"
-                else
-                    fail "kubeseal (tar extraction failed)"
-                fi
+        # Get version tag (e.g. "v0.37.0"), strip the "v" for the filename
+        KUBESEAL_TAG=$(curl -sf https://api.github.com/repos/bitnami-labs/sealed-secrets/releases/latest \
+            | grep '"tag_name"' | cut -d '"' -f 4)
+        # Fallback to known stable version if API rate-limited
+        KUBESEAL_TAG=${KUBESEAL_TAG:-v0.37.0}
+        KUBESEAL_VER="${KUBESEAL_TAG#v}"   # strip leading "v"
+        OS_NAME=$(uname -s | tr '[:upper:]' '[:lower:]')
+        # Filename format: kubeseal-{version}-{os}-amd64.tar.gz
+        KUBESEAL_URL="https://github.com/bitnami-labs/sealed-secrets/releases/download/${KUBESEAL_TAG}/kubeseal-${KUBESEAL_VER}-${OS_NAME}-amd64.tar.gz"
+        log "Downloading kubeseal ${KUBESEAL_TAG}..."
+        if wget -q "$KUBESEAL_URL" -O /tmp/kubeseal.tar.gz 2>/dev/null; then
+            EXTRACT_DIR=$(mktemp -d)
+            if tar xzf /tmp/kubeseal.tar.gz -C "$EXTRACT_DIR" 2>/dev/null && [ -f "$EXTRACT_DIR/kubeseal" ]; then
+                safe_install "$EXTRACT_DIR/kubeseal" /usr/local/bin/kubeseal \
+                    && rm -rf /tmp/kubeseal.tar.gz "$EXTRACT_DIR" && ok "kubeseal" \
+                    || fail "kubeseal (install failed)"
             else
-                fail "kubeseal (download failed)"
+                rm -rf /tmp/kubeseal.tar.gz "$EXTRACT_DIR"
+                fail "kubeseal (tar extraction failed — expected file: kubeseal-${KUBESEAL_VER}-${OS_NAME}-amd64.tar.gz)"
             fi
+        else
+            fail "kubeseal (download failed — URL: $KUBESEAL_URL)"
         fi
     else
         ok "kubeseal (installed)"
