@@ -258,12 +258,14 @@ else
   ARGOCD_ADMIN_PASS=""
   if [ "$HTPASSWD_AVAILABLE" = true ]; then
     # Generate bcrypt hash using htpasswd
+    # shellcheck disable=SC2016
     ARGOCD_ADMIN_PASS=$(htpasswd -bnBC 10 "" admin | tr -d ':\n' | sed 's/\$2y/$2a/' 2>/dev/null || echo "")
   fi
 
   # Fallback: use a known pre-computed bcrypt hash of "admin"
   if [ -z "$ARGOCD_ADMIN_PASS" ]; then
     info "htpasswd not available — using pre-computed bcrypt hash"
+    # shellcheck disable=SC2016
     ARGOCD_ADMIN_PASS='$2a$10$rRyBsGAAe/EFnxQcpGIHOe2.e6FFdS7I4j9k.bGG5MaJLrBQNb3hy'
   fi
 
