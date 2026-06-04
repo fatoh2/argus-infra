@@ -7,6 +7,7 @@ Argus Infra uses a three-stage CI/CD pipeline:
 3. **Deploy** — ArgoCD GitOps sync (path-filtered; docs-only pushes are skipped automatically)
 
 > **Local equivalent:** Run `make lint` for lint checks, `make validate` for Terraform validation,
+> `make test-scripts-dry` for fast script static checks, `make test-scripts` for full Docker-based script testing,
 > and `make sanity` for the full local suite. See the [Makefile](../Makefile) for all available targets.
 
 ## CI: Pull Request Validation
@@ -26,6 +27,8 @@ Triggered on every PR opened against `develop` and every push to `develop`/`main
 | Critical Files | Ensures all required files exist (manifests, configs, docs) |
 
 **Required to pass** before a PR can be merged to `develop`.
+
+> **Pre-PR gate:** Before opening any PR that touches `scripts/` or the `Makefile`, run `make test-scripts-dry` (fast static checks) and `make test-scripts` (full Docker-based runtime test). These verify all shell scripts pass `bash -n` syntax checks and shellcheck, and that `install-tools.sh` runs correctly in a clean Ubuntu 22.04 container.
 
 ## CD: Continuous Deployment
 

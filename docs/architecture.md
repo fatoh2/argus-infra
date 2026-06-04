@@ -238,6 +238,8 @@ Two scripts manage the local cluster lifecycle:
 |--------|-------------|
 | `make local-up` | Runs `scripts/local-cluster.sh` |
 | `make local-down` | Runs `scripts/local-cluster-down.sh` |
+| `make test-scripts-dry` | Static checks: bash -n + shellcheck (fast, no Docker) |
+| `make test-scripts` | Full script test in clean Docker container (must pass before PR) |
 
 ### Windows Support
 

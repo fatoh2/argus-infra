@@ -171,6 +171,8 @@ The project includes a `Makefile` with common infra operations. Run `make` or `m
 | `make bootstrap` | Run Windows bootstrap script (checks prerequisites) | Git Bash / WSL2 |
 | `make check-versions` | Print installed tool versions | — |
 | `make sanity` | Run full local sanity check suite | Installed tools |
+| `make test-scripts-dry` | Static checks: bash -n + shellcheck (fast, no Docker) | bash, shellcheck or Docker |
+| `make test-scripts` | Full script test in clean Docker container (must pass before PR) | Docker |
 
 ## Repository Structure
 

@@ -71,6 +71,8 @@ The root `Makefile` provides convenient shortcuts for common operations:
 | `make local-down` | Tear down local k3d cluster |
 | `make check-versions` | Print installed tool versions |
 | `make sanity` | Run full local sanity check suite |
+| `make test-scripts-dry` | Static checks: bash -n + shellcheck (fast, no Docker) |
+| `make test-scripts` | Full script test in clean Docker container (must pass before PR) |
 | `make setup-windows` | Show Windows setup guide |
 | `make bootstrap` | Run Windows bootstrap script (`BOOTSTRAP_WINDOWS.sh`) |
 
