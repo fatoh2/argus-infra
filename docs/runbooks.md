@@ -71,8 +71,9 @@ The root `Makefile` provides convenient shortcuts for common operations:
 | `make local-down` | Tear down local k3d cluster |
 | `make check-versions` | Print installed tool versions |
 | `make sanity` | Run full local sanity check suite |
-| `make setup-windows` | *(removed — see SETUP_WINDOWS.md for Windows setup)* |
 | `make bootstrap` | Run Windows bootstrap script (`BOOTSTRAP_WINDOWS.sh`) |
+| `make test-scripts-dry` | Static checks: bash -n + shellcheck (fast, no Docker) |
+| `make test-scripts` | Full script test in clean Docker container (must pass before PR) |
 
 All targets gracefully skip missing tools. Run `make` (or `make help`) to see the full list.
 
@@ -810,4 +811,96 @@ ssh argus@<public-ip> "docker --version && docker compose version"
 
 ### Module Reference
 
-See the [architecture documentation](architecture.md#17-aws-ec2-module) for the complete module reference (all variables, outputs, and configuration options). See [ADR 0006](adr/0006-aws-ec2-module.md) for the architecture decision record.
+See the [architecture documentation](architecture.md#18-aws-ec2-module) for the complete module reference (all variables, outputs, and configuration options). See [ADR 0006](adr/0006-aws-ec2-module.md) for the architecture decision record.
+
+## AWS EKS Deployment
+
+### Provision an EKS Cluster on AWS
+
+```bash
+cd terraform/environments/aws-eks
+
+# 1. Configure
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your AWS region and cluster settings
+
+# 2. Initialize
+terraform init
+
+# 3. Preview
+terraform plan
+
+# 4. Apply
+terraform apply
+
+# 5. Configure kubectl
+aws eks update-kubeconfig --region $(terraform output -raw cluster_region) --name $(terraform output -raw cluster_name)
+
+# 6. Verify
+kubectl get nodes
+kubectl get pods -A
+```
+
+### Destroy the EKS Cluster
+
+```bash
+cd terraform/environments/aws-eks
+terraform destroy
+```
+
+> **Warning:** `terraform destroy` will delete the EKS cluster, VPC, subnets, node group, NAT Gateways, and all associated resources. Data on worker node volumes is lost unless an AMI or snapshot was created.
+
+### Scaling the Node Group
+
+To change the number of worker nodes, update `num_nodes`, `min_nodes`, and `max_nodes` in `terraform.tfvars` and re-apply:
+
+```bash
+terraform plan
+terraform apply
+```
+
+### Upgrading the Kubernetes Version
+
+1. Update `cluster_version` in `terraform.tfvars` (e.g., from `1.31` to `1.32`)
+2. Review the plan:
+   ```bash
+   terraform plan
+   ```
+3. Apply:
+   ```bash
+   terraform apply
+   ```
+
+EKS performs a rolling upgrade of the control plane first, then the node group is updated.
+
+### Accessing the Cluster
+
+**Using the generated kubeconfig:**
+```bash
+kubectl get nodes --kubeconfig=$(terraform output -raw kubeconfig_path)
+```
+
+**Using aws eks update-kubeconfig:**
+```bash
+aws eks update-kubeconfig --region us-east-1 --name argus-cluster
+```
+
+### Enabling Control Plane Logging
+
+Update `enabled_cluster_log_types` in `terraform.tfvars`:
+
+```hcl
+enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+```
+
+Then re-apply:
+
+```bash
+terraform apply
+```
+
+Logs are shipped to Amazon CloudWatch Logs in the same region.
+
+### Module Reference
+
+See the [architecture documentation](architecture.md#19-aws-eks-module) for the complete module reference (all variables, outputs, and configuration options). See [ADR 0007](adr/0007-aws-eks-module.md) for the architecture decision record.

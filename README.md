@@ -4,15 +4,15 @@
 [![Cluster Sanity](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml)
 [![CD Deploy](https://github.com/fatoh2/argus-infra/actions/workflows/cd-deploy.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cd-deploy.yml)
 
-**A production-grade Kubernetes homelab platform** — provisioned with Terraform (Hetzner Cloud / GCP Compute Engine / GKE / AWS EC2), configured with Ansible, and managed via GitOps with ArgoCD.
+**A production-grade Kubernetes homelab platform** — provisioned with Terraform (Hetzner Cloud / GCP Compute Engine / GKE / AWS EC2 / AWS EKS), configured with Ansible, and managed via GitOps with ArgoCD.
 
 ## Overview
 
-Argus Infra provides a complete, reproducible Kubernetes cluster running on Hetzner Cloud VMs, a single VM on GCP Compute Engine or AWS EC2, or a managed GKE cluster on Google Cloud. Everything is defined as code:
+Argus Infra provides a complete, reproducible Kubernetes cluster running on Hetzner Cloud VMs, a single VM on GCP Compute Engine or AWS EC2, or managed Kubernetes clusters on GCP GKE or AWS EKS. Everything is defined as code:
 
 | Layer | Tool | Purpose |
 |-------|------|---------|
-| **Infrastructure** | Terraform | Provision Hetzner VMs, GCP Compute Engine VMs, GKE clusters, AWS EC2 instances, networks, SSH keys |
+| **Infrastructure** | Terraform | Provision Hetzner VMs, GCP Compute Engine VMs, GKE clusters, AWS EC2 instances, AWS EKS clusters, networks, SSH keys |
 | **Configuration** | Ansible | Install k3s, configure nodes, firewall rules |
 | **GitOps** | ArgoCD | Declarative app deployment, self-healing |
 | **Ingress** | Traefik + cert-manager | HTTP routing, automatic TLS via Let's Encrypt |
@@ -152,6 +152,29 @@ ssh argus@$(terraform output -raw public_ip) "docker --version && docker compose
 ```
 
 See the [AWS EC2 module documentation](docs/architecture.md#18-aws-ec2-module) for full details.
+### Managed Kubernetes (AWS EKS)
+
+For a fully managed Kubernetes cluster on Amazon Web Services with EKS:
+
+```bash
+# 0. Install required CLI tools
+make install-tools
+
+# 1. Provision an EKS cluster
+cd terraform/environments/aws-eks
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your AWS region and SSH public key
+terraform init && terraform apply
+
+# 2. Configure kubectl
+eval $(terraform output -raw kubectl_env)
+
+# 3. Verify cluster is ready
+kubectl get nodes
+```
+
+See the [EKS module documentation](docs/architecture.md#19-aws-eks-module) for full details.
+
 
 ## Makefile Targets
 
@@ -166,7 +189,6 @@ The project includes a `Makefile` with common infra operations. Run `make` or `m
 | `make install-tools` | Install CLI tools (Terraform, Ansible, kubectl, k3d, etc.) | sudo access |
 | `make local-up` | Spin up local k3d cluster for testing | k3d |
 | `make local-down` | Tear down local k3d cluster | k3d |
-| `make setup-windows` | Show Windows setup guide and Docker Desktop instructions | — |
 | `make bootstrap` | Run Windows bootstrap script (checks prerequisites) | Git Bash / WSL2 |
 | `make check-versions` | Print installed tool versions | — |
 | `make sanity` | Run full local sanity check suite | Installed tools |
@@ -192,7 +214,8 @@ argus-infra/
 │   │   ├── server/           # Hetzner server module
 │   │   ├── gcp-single-vm/    # GCP Compute Engine module
 │   │   ├── gcp-gke/          # GCP GKE module
-│   │   └── aws-single-vm/    # AWS EC2 module
+│   │   ├── aws-single-vm/    # AWS EC2 module
+│   │   └── aws-eks/           # AWS EKS module
 │   └── environments/         # Environment-specific configs
 │       ├── homelab/          # Hetzner homelab environment
 │       ├── gcp-single-vm/    # GCP single VM environment

@@ -570,3 +570,166 @@ ssh argus@$(terraform output -raw public_ip)
 - It does **not** create a VPC with private subnets or NAT gateways (single public subnet only)
 
 These are left to the user or future enhancements. See [ADR 0006](adr/0006-aws-ec2-module.md) for the full decision record.
+## 19. AWS EKS Module
+
+### Module: `modules/aws-eks/`
+
+The AWS EKS module provisions a fully managed Kubernetes cluster on Amazon Web Services using Elastic Kubernetes Service (EKS). It creates a complete VPC infrastructure with public and private subnets across multiple availability zones, an EKS cluster with managed node groups, and optional kubeconfig generation.
+
+### What it provisions
+
+| Resource | Description |
+|----------|-------------|
+| **VPC** | Custom VPC with DNS support and hostnames enabled |
+| **Internet Gateway** | For public internet access |
+| **Public Subnets** | One per availability zone, with auto-assign public IP |
+| **Private Subnets** | One per availability zone, for worker nodes |
+| **NAT Gateway** | One per availability zone (configurable) |
+| **EKS Cluster** | Managed Kubernetes control plane |
+| **Managed Node Group** | Auto-scaling worker nodes with configurable instance types |
+| **IAM Roles** | Cluster role + node group role with least-privilege policies |
+| **Security Groups** | Cluster security group + node security group |
+| **OIDC Provider** | IAM OIDC identity provider for IRSA (IAM Roles for Service Accounts) |
+| **kubeconfig** | Optional local kubeconfig file generation |
+
+### Architecture
+
+```
+Internet
+    │
+    ▼
+Internet Gateway
+    │
+    ├── Public Subnets (AZ a, b, c)
+    │       └── NAT Gateway (one per AZ)
+    │               │
+    │               ▼
+    │       Private Subnets (AZ a, b, c)
+    │           ├── EKS Cluster (control plane)
+    │           └── Managed Node Group (worker nodes)
+    │
+    └── EKS API Endpoint (public or private)
+```
+
+### Usage
+
+```hcl
+module "argus_eks" {
+  source = "../../modules/aws-eks"
+
+  cluster_name    = "argus-cluster"
+  region          = "us-east-1"
+  cluster_version = "1.31"
+
+  vpc_cidr           = "10.0.0.0/16"
+  availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
+  enable_nat_gateway = true
+
+  endpoint_private_access = false
+  endpoint_public_access  = true
+  public_access_cidrs     = ["0.0.0.0/0"]
+
+  num_nodes           = 3
+  min_nodes           = 1
+  max_nodes           = 10
+  node_instance_types = ["t3.xlarge"]
+  node_disk_size      = 100
+
+  enabled_cluster_log_types = ["api", "audit", "authenticator"]
+
+  generate_kubeconfig = true
+  kubeconfig_path     = "~/.kube/config-argus-cluster"
+
+  tags = {
+    project = "argus"
+    managed = "terraform"
+  }
+}
+```
+
+### Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `cluster_name` | `argus-cluster` | Name of the EKS cluster |
+| `region` | `us-east-1` | AWS region |
+| `cluster_version` | `1.31` | Kubernetes version |
+| `vpc_cidr` | `10.0.0.0/16` | VPC CIDR block |
+| `availability_zones` | `["us-east-1a", "us-east-1b", "us-east-1c"]` | AZs for subnets |
+| `enable_nat_gateway` | `true` | Create NAT Gateways per AZ |
+| `endpoint_private_access` | `false` | Private API endpoint access |
+| `endpoint_public_access` | `true` | Public API endpoint access |
+| `public_access_cidrs` | `["0.0.0.0/0"]` | Public API endpoint CIDRs |
+| `num_nodes` | `3` | Desired worker nodes |
+| `min_nodes` | `1` | Minimum worker nodes |
+| `max_nodes` | `10` | Maximum worker nodes |
+| `node_instance_types` | `["t3.xlarge"]` | Worker node instance types |
+| `node_disk_size` | `100` | Worker node disk size (GB) |
+| `node_ssh_key_name` | `null` | EC2 key pair for SSH access |
+| `enable_node_ssh` | `false` | Allow SSH to worker nodes |
+| `allowed_ssh_cidrs` | `["0.0.0.0/0"]` | SSH source CIDRs |
+| `enabled_cluster_log_types` | `["api", "audit", "authenticator"]` | Control plane log types |
+| `generate_kubeconfig` | `true` | Generate local kubeconfig |
+| `kubeconfig_path` | `~/.kube/config-argus-cluster` | kubeconfig file path |
+| `tags` | `{project="argus", managed="terraform"}` | Resource tags |
+
+### Outputs
+
+| Output | Description |
+|--------|-------------|
+| `cluster_id` | EKS cluster ID |
+| `cluster_name` | EKS cluster name |
+| `cluster_arn` | EKS cluster ARN |
+| `cluster_endpoint` | API server endpoint URL |
+| `cluster_version` | Kubernetes version |
+| `cluster_security_group_id` | Control plane security group ID |
+| `oidc_provider_arn` | OIDC provider ARN |
+| `oidc_provider_url` | OIDC provider URL |
+| `node_group_id` | Node group ID |
+| `node_group_arn` | Node group ARN |
+| `node_group_status` | Node group status |
+| `node_instance_types` | Node instance types |
+| `desired_nodes` | Desired node count |
+| `vpc_id` | VPC ID |
+| `vpc_cidr` | VPC CIDR block |
+| `public_subnet_ids` | Public subnet IDs |
+| `private_subnet_ids` | Private subnet IDs |
+| `node_security_group_id` | Worker node security group ID |
+| `cluster_iam_role_arn` | Cluster IAM role ARN |
+| `node_iam_role_arn` | Node IAM role ARN |
+| `node_iam_role_name` | Node IAM role name |
+| `kubeconfig_path` | Path to generated kubeconfig |
+| `kubectl_command` | Ready-to-use kubectl command |
+
+### Quick Start
+
+```bash
+cd terraform/environments/aws-eks
+
+# Copy and edit the example vars
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your AWS region and settings
+
+# Initialize and plan
+terraform init
+terraform plan
+
+# Apply
+terraform apply
+
+# Configure kubectl
+eval $(terraform output -raw kubectl_env)
+
+# Verify
+kubectl get nodes
+```
+
+### What the module does NOT do
+
+- It does **not** deploy applications into the cluster (that's ArgoCD's job)
+- It does **not** configure IAM roles for service accounts (IRSA) beyond the default
+- It does **not** set up VPC peering or multi-cluster networking
+- It does **not** install monitoring or ingress controllers (those are managed via ArgoCD)
+- It does **not** manage DNS records (Route53)
+
+These are left to the user or future enhancements. See [ADR 0007](adr/0007-aws-eks-module.md) for the full decision record.

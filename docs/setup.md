@@ -378,6 +378,83 @@ terraform apply
 ssh argus@$(terraform output -raw public_ip)
 ```
 
+## AWS EKS (Managed Kubernetes)
+
+### Prerequisites
+
+- **AWS account** — with billing enabled
+- **AWS credentials** — configured via environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) or `aws configure`
+- **AWS CLI** — installed and authenticated (`aws sts get-caller-identity` should succeed)
+- **CLI tools** — install via `make install-tools` (Terraform, kubectl, Helm)
+
+### Configure Variables
+
+```bash
+cd terraform/environments/aws-eks
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Edit `terraform.tfvars` with your AWS region and cluster settings:
+
+```hcl
+cluster_name    = "argus-cluster"
+region          = "us-east-1"
+environment     = "production"
+cluster_version = "1.31"
+
+vpc_cidr           = "10.0.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
+enable_nat_gateway = true
+
+num_nodes           = 3
+min_nodes           = 1
+max_nodes           = 10
+node_instance_types = ["t3.xlarge"]
+node_disk_size      = 100
+```
+
+### Provision
+
+```bash
+terraform init
+terraform plan
+terraform apply
+```
+
+### Configure kubectl
+
+After provisioning, configure kubectl to connect to the new cluster:
+
+```bash
+aws eks update-kubeconfig --region us-east-1 --name $(terraform output -raw cluster_name)
+```
+
+Or use the generated kubeconfig file:
+
+```bash
+kubectl get nodes --kubeconfig=$(terraform output -raw kubeconfig_path)
+```
+
+### Verify
+
+```bash
+kubectl get nodes
+kubectl get pods -A
+```
+
+### Cleanup
+
+```bash
+cd terraform/environments/aws-eks
+terraform destroy
+```
+
+> **Warning:** `terraform destroy` will delete the EKS cluster, VPC, subnets, node group, and all associated resources. Data on worker node volumes is lost.
+
+### Module Reference
+
+See the [architecture documentation](docs/architecture.md#19-aws-eks-module) for the complete module reference (all variables, outputs, and configuration options).
+
 ## Troubleshooting
 
 ### Terraform
@@ -429,6 +506,13 @@ terraform destroy
 
 ```bash
 cd terraform/environments/aws-single-vm
+terraform destroy
+```
+
+### AWS EKS
+
+```bash
+cd terraform/environments/aws-eks
 terraform destroy
 ```
 

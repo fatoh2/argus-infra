@@ -18,9 +18,9 @@ Triggered on every PR opened against `develop` and every push to `develop`/`main
 
 | Step | What it checks |
 |------|----------------|
-| Terraform Validate | `terraform validate` on the homelab environment |
+| Terraform Validate | `terraform validate` on all environments (homelab, gcp-single-vm, gcp-gke, aws-single-vm, aws-eks) |
 | Terraform Format | `terraform fmt -check` ensures consistent formatting |
-| Terraform Plan | Dry-run plan (targeting network module only) to catch config errors |
+| Terraform Plan | Dry-run plan (targeting network module only for homelab) to catch config errors |
 | Ansible Syntax | `ansible-playbook --syntax-check` validates playbook structure |
 | Ansible Lint | `ansible-lint` enforces best practices across all playbooks and roles |
 | ShellCheck | Static analysis for shell scripts in `scripts/` |
@@ -36,7 +36,7 @@ Triggered on every PR opened against `develop` and every push to `develop`/`main
 
 Triggered on every push to `main` — but only when the push touches infrastructure-relevant paths:
 
-- `terraform/**`
+- `terraform/**` (all environments: homelab, gcp-single-vm, gcp-gke, aws-single-vm, aws-eks)
 - `ansible/**`
 - `k8s/**`
 - `scripts/**`
