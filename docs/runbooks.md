@@ -71,7 +71,7 @@ The root `Makefile` provides convenient shortcuts for common operations:
 | `make local-down` | Tear down local k3d cluster |
 | `make check-versions` | Print installed tool versions |
 | `make sanity` | Run full local sanity check suite |
-| `make setup-windows` | Show Windows setup guide |
+| `make setup-windows` | *(removed — see SETUP_WINDOWS.md for Windows setup)* |
 | `make bootstrap` | Run Windows bootstrap script (`BOOTSTRAP_WINDOWS.sh`) |
 
 All targets gracefully skip missing tools. Run `make` (or `make help`) to see the full list.
