@@ -38,6 +38,28 @@ make local-up
 make local-down
 ```
 
+### Windows
+
+For Windows development, see the [Windows Setup Guide](SETUP_WINDOWS.md).
+
+```bash
+# 0. Run the bootstrap script (Git Bash or WSL2) to check prerequisites
+bash BOOTSTRAP_WINDOWS.sh
+
+# 1. Install required CLI tools
+make install-tools
+
+# 2. Create local cluster with ArgoCD, Prometheus, and Loki
+make local-up
+
+# 3. Tear down when done
+make local-down
+```
+
+> **Note:** On Windows, use **Git Bash** (not Command Prompt or PowerShell) for shell commands.
+> Docker Desktop with WSL2 backend is required for k3d clusters.
+> See [SETUP_WINDOWS.md](SETUP_WINDOWS.md) for detailed Windows setup instructions.
+
 ### Production (Hetzner Cloud)
 
 ```bash
@@ -83,7 +105,7 @@ ssh argus@$(terraform output -raw public_ip)
 ssh argus@$(terraform output -raw public_ip) "docker --version && docker compose version"
 ```
 
-See the [GCP module documentation](docs/architecture.md#15-gcp-compute-engine-module) for full details.
+See the [GCP module documentation](docs/architecture.md#16-gcp-compute-engine-module) for full details.
 
 ### Managed Kubernetes (GCP GKE)
 
@@ -106,7 +128,7 @@ gcloud container clusters get-credentials $(terraform output -raw cluster_name) 
 kubectl get nodes
 ```
 
-See the [GKE module documentation](docs/architecture.md#16-gcp-gke-module) for full details.
+See the [GKE module documentation](docs/architecture.md#17-gcp-gke-module) for full details.
 
 ### Single VM (AWS EC2)
 
@@ -129,7 +151,7 @@ ssh argus@$(terraform output -raw public_ip)
 ssh argus@$(terraform output -raw public_ip) "docker --version && docker compose version"
 ```
 
-See the [AWS EC2 module documentation](docs/architecture.md#17-aws-ec2-module) for full details.
+See the [AWS EC2 module documentation](docs/architecture.md#18-aws-ec2-module) for full details.
 
 ## Makefile Targets
 
@@ -144,8 +166,12 @@ The project includes a `Makefile` with common infra operations. Run `make` or `m
 | `make install-tools` | Install CLI tools (Terraform, Ansible, kubectl, k3d, etc.) | sudo access |
 | `make local-up` | Spin up local k3d cluster for testing | k3d |
 | `make local-down` | Tear down local k3d cluster | k3d |
+| `make setup-windows` | Show Windows setup guide and Docker Desktop instructions | — |
+| `make bootstrap` | Run Windows bootstrap script (checks prerequisites) | Git Bash / WSL2 |
 | `make check-versions` | Print installed tool versions | — |
 | `make sanity` | Run full local sanity check suite | Installed tools |
+| `make test-scripts-dry` | Static checks: bash -n + shellcheck (fast, no Docker) | bash, shellcheck or Docker |
+| `make test-scripts` | Full script test in clean Docker container (must pass before PR) | Docker |
 
 > All targets gracefully skip missing tools. Run `make` (or `make help`) to see the full list.
 

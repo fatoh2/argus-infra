@@ -34,6 +34,8 @@ helm/base-app/      Shared chart template all apps extend
 docs/
   runbooks.md       Operational procedures — always keep updated
   adr/              Architecture Decision Records
+BOOTSTRAP_WINDOWS.sh        Windows bootstrap — checks Docker, kubectl, k3d, helm prerequisites
+SETUP_WINDOWS.md             Windows setup guide (Docker Desktop, WSL2, Chocolatey)
 scripts/
   install-tools.sh           One-command tool installation (Terraform, Ansible, kubectl, Helm, ArgoCD, k3d, kubeseal)
   versions.sh                Print all tool versions for debugging
@@ -61,6 +63,7 @@ scripts/
 - **ALWAYS** run `helm lint` before committing chart changes
 - **ALWAYS** update `docs/runbooks.md` when adding or changing operational procedures
 - **ALWAYS** run `make sanity` (or `./scripts/run-sanity-checks.sh` directly) before opening a PR to catch issues early
+- **ALWAYS** run `make test-scripts-dry` (or `make test-scripts` if you changed scripts/) before opening a PR that touches `scripts/` or the `Makefile`
 
 ## PR Format
 ```
@@ -85,6 +88,7 @@ Body:
 - [ ] No secrets in diff
 - [ ] Runbook updated (if applicable)
 - [ ] Local sanity checks passed (make sanity or ./scripts/run-sanity-checks.sh)
+- [ ] Script tests passed (make test-scripts-dry; make test-scripts if scripts/ changed)
 - [ ] Resource limits set on all new pods
 ```
 

@@ -582,8 +582,8 @@ bash scripts/local-cluster.sh
 ```
 
 This creates a k3d cluster named `argus-local` with:
-- Port mappings: `8080:80` (HTTP) and `8443:443` (HTTPS) via the k3d loadbalancer
-- **ArgoCD** installed from official manifests in the `argocd` namespace
+- Port mappings: `80:80` (HTTP) and `443:443` (HTTPS) via the k3d loadbalancer
+- **ArgoCD** installed via Helm in the `argocd` namespace (admin password: `admin`)
 - **kube-prometheus-stack** (Prometheus + Grafana + AlertManager) in the `monitoring` namespace
 - **Loki** (log aggregation) in the `logging` namespace
 
@@ -596,9 +596,9 @@ The script is fully idempotent:
 
 ```bash
 # ArgoCD UI
-kubectl port-forward svc/argocd-server -n argocd 8080:80
-# Get initial password:
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
+kubectl port-forward -n argocd svc/argocd-server 8080:443
+# Open: https://localhost:8080
+# User: admin | Password: admin
 
 # Grafana
 kubectl port-forward svc/prometheus-grafana -n monitoring 3000:80
@@ -640,7 +640,7 @@ This deletes the entire `argus-local` k3d cluster. All resources (pods, volumes,
 | Cluster already exists | Previous cluster not torn down | Run `bash scripts/local-cluster-down.sh` first |
 | ArgoCD pods stuck in Pending | Insufficient resources | Increase Docker resources (min 4GB RAM, 2 CPUs) |
 | Helm install fails | Helm repo not updated | Script handles this with `helm repo update` |
-| Port conflicts | `:8080` or `:8443` already in use | Stop other services using those ports, or modify the script |
+| Port conflicts | `:80` or `:443` already in use | Stop other services using those ports, or modify the script |
 
 ## GCP VM Deployment
 
