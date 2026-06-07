@@ -1,36 +1,36 @@
 #!/bin/bash
-# Tear down local k3d cluster
+#===============================================================================
+# local-cluster-down.sh — Tear down the local k3d cluster
+#
+# Usage:
+#   bash scripts/local-cluster-down.sh
+#
+# Exit codes:
+#   0 — Cluster deleted or didn't exist
+#===============================================================================
 
-set -e
+set -euo pipefail
 
 CLUSTER_NAME="argus-local"
 
-log() { echo "→ $1"; }
-ok() { echo "✓ $1"; }
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-log "Tearing down k3d cluster: $CLUSTER_NAME..."
+info()  { echo -e "  ${BLUE}*${NC} $*"; }
+ok()    { echo -e "  ${GREEN}+${NC} $*"; }
+warn()  { echo -e "  ${YELLOW}!${NC} $*"; }
 
-if k3d cluster list | grep -q "$CLUSTER_NAME"; then
-    k3d cluster delete "$CLUSTER_NAME" || {
-        echo "✗ Failed to delete cluster"
-        exit 1
-    }
-    ok "Cluster deleted"
+if ! command -v k3d &>/dev/null; then
+  warn "k3d not installed — nothing to do"
+  exit 0
+fi
+
+if k3d cluster list 2>/dev/null | grep -q "$CLUSTER_NAME"; then
+  info "Deleting cluster '$CLUSTER_NAME'..."
+  k3d cluster delete "$CLUSTER_NAME" > /tmp/k3d-delete.log 2>&1
+  ok "Cluster '$CLUSTER_NAME' deleted"
 else
-    echo "⚠️  Cluster '$CLUSTER_NAME' not found"
-    exit 0
+  info "No cluster '$CLUSTER_NAME' found — nothing to do"
 fi
-
-# Remove kubeconfig
-if [ -f ~/.kube/config-"$CLUSTER_NAME" ]; then
-    rm ~/.kube/config-"$CLUSTER_NAME"
-    ok "Kubeconfig removed"
-fi
-
-# Remove registry
-if k3d registry list | grep -q "^argus-local$"; then
-    k3d registry delete argus-local 2>/dev/null || true
-fi
-
-echo ""
-echo "✅ Local cluster '$CLUSTER_NAME' has been torn down"

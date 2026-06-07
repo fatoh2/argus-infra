@@ -1,32 +1,55 @@
 #!/bin/bash
-# Print versions of installed tools
+# Argus Infra — Tool Version Reporter
+# Prints versions of all required CLI tools for debugging.
+#
+# Usage:
+#   bash scripts/versions.sh
 
-echo "Argus Infra — CLI Tool Versions"
-echo "═══════════════════════════════════════════════════════════════════════"
-
-print_version() {
-    local tool=$1
-    local cmd=$2
-
-    if command -v "$tool" &>/dev/null; then
-        printf "%-20s " "$tool:"
-        eval "$cmd" 2>/dev/null || echo "unknown"
-    else
-        printf "%-20s %s\n" "$tool:" "⚠️  NOT INSTALLED"
-    fi
-}
-
-# Print versions
-print_version "terraform" "terraform -v 2>/dev/null | head -1 | cut -d ' ' -f 1-2"
-print_version "kubectl" "kubectl version --client --short 2>/dev/null | grep -o 'v[0-9.]*'"
-print_version "helm" "helm version --short 2>/dev/null | cut -d ':' -f 2 | tr -d ' '"
-print_version "k3d" "k3d version 2>/dev/null | grep -o 'v[0-9.]*' | head -1"
-print_version "ansible" "ansible --version 2>/dev/null | head -1 | grep -o 'core [0-9.]*'"
-print_version "argocd" "argocd version --short 2>/dev/null | head -1"
-print_version "kubeseal" "kubeseal --version 2>/dev/null | grep -o 'v[0-9.]*'"
-print_version "shellcheck" "shellcheck --version 2>/dev/null | head -1 | grep -o 'v[0-9.]*'"
-print_version "git" "git --version 2>/dev/null | grep -o '[0-9.]*' | head -1"
-print_version "docker" "docker --version 2>/dev/null | grep -o '[0-9.]*' | head -1"
+set -uo pipefail
 
 echo ""
-echo "═══════════════════════════════════════════════════════════════════════"
+echo "╔══════════════════════════════════════╗"
+echo "║     Argus Infra — Tool Versions      ║"
+echo "╚══════════════════════════════════════╝"
+echo ""
+
+print_version() {
+  local name="$1"
+  local cmd="$2"
+  local label="${3:-}"
+
+  printf "  %-12s " "$name"
+  if command -v "$(echo "$cmd" | awk '{print $1}')" &>/dev/null; then
+    local version
+    version=$(eval "$cmd" 2>/dev/null | head -1)
+    echo -e "\033[1;32m✓\033[0m ${label}${version}"
+  else
+    echo -e "\033[1;31m✗\033[0m NOT INSTALLED"
+  fi
+}
+
+print_version "terraform"   "terraform --version 2>/dev/null | head -1"
+print_version "ansible"     "ansible --version 2>/dev/null | head -1"
+print_version "ansible-galaxy" "ansible-galaxy --version 2>/dev/null | head -1"
+print_version "kubectl"     "kubectl version --client 2>/dev/null | head -1"
+print_version "helm"        "helm version --short 2>/dev/null"
+print_version "argocd"      "argocd version --client --short 2>/dev/null | head -1"
+print_version "k3d"         "k3d --version 2>/dev/null | head -1"
+print_version "kubeseal"    "kubeseal --version 2>/dev/null"
+
+echo ""
+
+# Also print Ansible collection versions
+if command -v ansible-galaxy &>/dev/null; then
+  echo "  ── Ansible Collections ──"
+  ansible-galaxy collection list 2>/dev/null | grep -E "(community\.|kubernetes\.|ansible\.)" | while read -r line; do
+    echo "    $line"
+  done
+  echo ""
+fi
+
+echo "  ── System Info ──"
+echo "    OS:      $(lsb_release -ds 2>/dev/null || grep PRETTY_NAME /etc/os-release 2>/dev/null | cut -d= -f2 | tr -d '\"' || echo 'unknown')"
+echo "    Kernel:  $(uname -r)"
+echo "    Arch:    $(uname -m)"
+echo ""

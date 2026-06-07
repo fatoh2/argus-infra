@@ -1,0 +1,19 @@
+# Copy to terraform.tfvars and fill in real values.
+# terraform.tfvars is gitignored (only *.tfvars.example is committed).
+
+# === Required ===
+
+# GCP project ID
+project_id = "your-gcp-project-id"
+
+# === Optional (defaults shown) ===
+
+# region              = "us-central1"
+# cluster_name        = "argus-cluster"
+# num_nodes           = 3
+# node_machine_type   = "e2-standard-4"
+# enable_autopilot    = true
+# release_channel     = "REGULAR"
+# network             = null
+# subnetwork          = null
+# deletion_protection = false

@@ -1,288 +1,465 @@
 #!/bin/bash
-# Install required CLI tools for Argus Infra
-# Requires: bash 4+
-# Note: Some tools have limitations on Windows (Ansible, kubeseal)
+# Argus Infra — Tool Installer
+# Installs all CLI tools required to work with the argus-infra repo.
+# Targets: Ubuntu/Debian (22.04+), macOS, Windows (Git Bash / WSL2)
+#
+# Usage:
+#   bash scripts/install-tools.sh          # interactive
+#   bash scripts/install-tools.sh --quiet  # minimal output
+#
+# Each tool checks if already installed (skips if present).
+# Errors are handled gracefully — one tool failure doesn't block others.
 
-# Don't exit on first error - we want to try all tools
-set +e
+set -uo pipefail
 
-TOOLS_INSTALLED=0
-TOOLS_SKIPPED=0
-TOOLS_FAILED=0
+# ── Config ────────────────────────────────────────────────────────────────────
+TERRAFORM_VERSION="1.7.5"  # pinned fallback — update as needed
+QUIET=false
+[[ "${1:-}" == "--quiet" ]] && QUIET=true
 
-# ── OS detection ─────────────────────────────────────────────────────────────
+# ── OS Detection ──────────────────────────────────────────────────────────────
+# Multi-signal detection for Windows, WSL2, macOS, Linux
 detect_os() {
-    if [[ "${OS:-}" == "Windows_NT" || "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
-        echo "windows"
-    elif grep -qi "microsoft" /proc/version 2>/dev/null; then
-        echo "wsl2"
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "macos"
-    else
-        echo "linux"
-    fi
+  if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "${OS:-}" == "Windows_NT" ]]; then
+    echo "windows"
+  elif grep -qi "microsoft" /proc/version 2>/dev/null; then
+    echo "wsl2"
+  elif [[ "$OSTYPE" == "darwin"* ]]; then
+    echo "macos"
+  else
+    echo "linux"
+  fi
 }
-DETECTED_OS=$(detect_os)
-IS_WINDOWS=false
-[[ "$DETECTED_OS" == "windows" ]] && IS_WINDOWS=true
+OS_TYPE=$(detect_os)
 
-log()  { echo "→ $1"; }
-ok()   { echo "✓ $1"; TOOLS_INSTALLED=$((TOOLS_INSTALLED+1)); }
-skip() { echo "⊘ $1 (skipped)"; TOOLS_SKIPPED=$((TOOLS_SKIPPED+1)); }
-fail() { echo "✗ $1"; TOOLS_FAILED=$((TOOLS_FAILED+1)); }
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
-# safe_install: cross-platform binary install (replaces sudo install -o root -g root which breaks on macOS)
-safe_install() {
-    local src=$1 dst=$2
-    sudo mv "$src" "$dst" && sudo chmod 755 "$dst"
+info()  { echo -e "  \033[1;34m•\033[0m $*"; }
+ok()    { echo -e "  \033[1;32m✓\033[0m $*"; }
+warn()  { echo -e "  \033[1;33m⚠\033[0m $*"; }
+fail()  { echo -e "  \033[1;31m✗\033[0m $*"; }
+header(){ echo -e "\n\033[1;36m── $* ──\033[0m"; }
+
+quiet() {
+  if $QUIET; then "$@" > /dev/null 2>&1; else "$@"; fi
 }
 
-log "Installing Argus Infra CLI tools (OS: $DETECTED_OS)..."
-echo ""
-
-# ── Bootstrap: make + core utilities ─────────────────────────────────────────
-# make must exist before anything else — install it silently if missing
-if ! command -v make &>/dev/null && command -v apt-get &>/dev/null; then
-    log "Installing make (required for all Makefile targets)..."
-    sudo apt-get update -qq >/dev/null 2>&1 || true
-    sudo apt-get install -y -qq make >/dev/null 2>&1 && ok "make" || fail "make"
-elif ! command -v make &>/dev/null && [[ "$DETECTED_OS" == "macos" ]]; then
-    log "Installing make via Xcode CLI tools..."
-    xcode-select --install 2>/dev/null || true
-fi
-
-# Install other core dependencies (unzip, wget, curl, jq)
-if command -v apt-get &>/dev/null; then
-    MISSING_DEPS=""
-    for dep in unzip wget curl jq; do
-        command -v "$dep" &>/dev/null || MISSING_DEPS="$MISSING_DEPS $dep"
-    done
-    if [ -n "$MISSING_DEPS" ]; then
-        log "Installing core dependencies:$MISSING_DEPS"
-        sudo apt-get update -qq >/dev/null 2>&1 || { log "WARNING: apt-get update failed — installs may fail"; }
-        sudo apt-get install -y -qq $MISSING_DEPS >/dev/null 2>&1 || true
-    fi
-fi
-echo ""
-
-# Terraform
-if ! command -v terraform &>/dev/null; then
-    log "Installing Terraform..."
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        brew install terraform 2>/dev/null && ok "Terraform" || fail "Terraform"
-    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        # Get latest version
-        TERRAFORM_VERSION=$(curl -s https://api.github.com/repos/hashicorp/terraform/releases/latest 2>/dev/null | grep tag_name | cut -d '"' -f 4 | sed 's/v//')
-        if [ -z "$TERRAFORM_VERSION" ]; then
-            fail "Terraform (could not determine version)"
-        else
-            TERRAFORM_URL="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
-            # Try to download and install
-            if wget -q "$TERRAFORM_URL" -O /tmp/terraform.zip 2>/dev/null; then
-                if command -v unzip &>/dev/null; then
-                    sudo unzip -o /tmp/terraform.zip -d /usr/local/bin/ >/dev/null 2>&1 && rm /tmp/terraform.zip && ok "Terraform" || fail "Terraform"
-                else
-                    fail "Terraform (unzip not available; try: sudo apt-get install unzip)"
-                fi
-            else
-                fail "Terraform (download failed)"
-            fi
-        fi
-    elif [ "$IS_WINDOWS" = true ]; then
-        skip "Terraform (use chocolatey: choco install terraform)"
-    fi
-else
-    ok "Terraform ($(terraform version -json 2>/dev/null | grep terraform_version | cut -d '"' -f 4 || echo 'installed'))"
-fi
-
-# kubectl
-if ! command -v kubectl &>/dev/null; then
-    log "Installing kubectl..."
-    if [[ "$DETECTED_OS" == "linux" || "$DETECTED_OS" == "wsl2" || "$DETECTED_OS" == "macos" ]]; then
-        KUBE_VER=$(curl -Ls https://dl.k8s.io/release/stable.txt)
-        OS_NAME=$(uname -s | tr '[:upper:]' '[:lower:]')
-        curl -sL "https://dl.k8s.io/release/${KUBE_VER}/bin/${OS_NAME}/amd64/kubectl" -o /tmp/kubectl
-        safe_install /tmp/kubectl /usr/local/bin/kubectl && ok "kubectl" || fail "kubectl"
-    elif [ "$IS_WINDOWS" = true ]; then
-        skip "kubectl (use chocolatey: choco install kubernetes-cli)"
-    fi
-else
-    ok "kubectl (installed)"
-fi
-
-# Helm
-if ! command -v helm &>/dev/null; then
-    log "Installing Helm..."
-    if [[ "$OSTYPE" == "linux-gnu"* ]] || [[ "$OSTYPE" == "darwin"* ]]; then
-        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 2>/dev/null | bash 2>/dev/null && ok "Helm" || fail "Helm"
-    elif [ "$IS_WINDOWS" = true ]; then
-        skip "Helm (use chocolatey: choco install kubernetes-helm)"
-    fi
-else
-    ok "Helm (installed)"
-fi
-
-# k3d
-if ! command -v k3d &>/dev/null; then
-    log "Installing k3d..."
-    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        wget -q -O - https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh 2>/dev/null | bash 2>/dev/null && ok "k3d" || fail "k3d"
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        brew install k3d 2>/dev/null && ok "k3d" || fail "k3d"
-    elif [ "$IS_WINDOWS" = true ]; then
-        skip "k3d (use chocolatey: choco install k3d)"
-    fi
-else
-    ok "k3d (installed)"
-fi
-
-# Ansible
-if [ "$IS_WINDOWS" = true ]; then
-    if command -v ansible &>/dev/null 2>&1; then
-        ok "Ansible (installed, Windows support limited)"
+# Install a binary to /usr/local/bin with proper permissions.
+# Uses sudo if available, falls back to direct install.
+# Uses sudo mv (not sudo install) for macOS compatibility.
+install_binary() {
+  local src="$1"
+  local dest="$2"
+  if [[ -f "$src" ]]; then
+    if sudo mv "$src" "$dest" 2>/dev/null; then
+      sudo chmod +x "$dest" 2>/dev/null
+    elif mv "$src" "$dest" 2>/dev/null; then
+      chmod +x "$dest"
     else
-        skip "Ansible (Windows support is limited; use WSL2 or Linux VM)"
+      fail "Cannot install to $dest (permission denied)"
+      return 1
     fi
-else
-    # Try to use ansible if available, even if it has issues
-    if command -v ansible &>/dev/null 2>&1; then
-        ok "Ansible (installed)"
-    else
-        log "Installing Ansible..."
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            brew install ansible 2>/dev/null && ok "Ansible" || fail "Ansible"
-        elif command -v pip3 &>/dev/null; then
-            # Use pip3 - more reliable than apt on WSL
-            pip3 install --user ansible ansible-lint 2>/dev/null && ok "Ansible" || fail "Ansible"
-        elif command -v apt-get &>/dev/null; then
-            # Fall back to apt
-            sudo apt-get update >/dev/null 2>&1 && sudo apt-get install -y ansible >/dev/null 2>&1 && ok "Ansible" || fail "Ansible"
-        else
-            fail "Ansible (no package manager found)"
-        fi
-    fi
-fi
+  else
+    fail "Source file $src not found"
+    return 1
+  fi
+}
 
-# ArgoCD CLI
-if ! command -v argocd &>/dev/null; then
-    if [ "$IS_WINDOWS" = true ]; then
-        skip "ArgoCD CLI (use chocolatey: choco install argocd-cli)"
-    else
-        log "Installing ArgoCD CLI..."
-        ARGOCD_URL="https://github.com/argoproj/argo-cd/releases/latest/download/argocd-$(uname -s | tr '[:upper:]' '[:lower:]')-amd64"
-        curl -sSL -o /tmp/argocd "$ARGOCD_URL" 2>/dev/null && \
-        sudo install -m 555 /tmp/argocd /usr/local/bin/argocd && rm /tmp/argocd && ok "ArgoCD CLI" || fail "ArgoCD CLI"
-    fi
-else
-    ok "ArgoCD CLI (installed)"
-fi
-
-# kubeseal - issues on Windows, skip with instructions
-if [ "$IS_WINDOWS" = true ]; then
-    if command -v kubeseal &>/dev/null; then
-        ok "kubeseal (installed)"
-    else
-        skip "kubeseal (Windows installation complex; use Docker or Linux VM)"
-    fi
-else
-    if ! command -v kubeseal &>/dev/null; then
-        log "Installing kubeseal..."
-        # Get version tag (e.g. "v0.37.0"), strip the "v" for the filename
-        KUBESEAL_TAG=$(curl -sf https://api.github.com/repos/bitnami-labs/sealed-secrets/releases/latest \
-            | grep '"tag_name"' | cut -d '"' -f 4)
-        # Fallback to known stable version if API rate-limited
-        KUBESEAL_TAG=${KUBESEAL_TAG:-v0.37.0}
-        KUBESEAL_VER="${KUBESEAL_TAG#v}"   # strip leading "v"
-        OS_NAME=$(uname -s | tr '[:upper:]' '[:lower:]')
-        # Filename format: kubeseal-{version}-{os}-amd64.tar.gz
-        KUBESEAL_URL="https://github.com/bitnami-labs/sealed-secrets/releases/download/${KUBESEAL_TAG}/kubeseal-${KUBESEAL_VER}-${OS_NAME}-amd64.tar.gz"
-        log "Downloading kubeseal ${KUBESEAL_TAG}..."
-        if wget -q "$KUBESEAL_URL" -O /tmp/kubeseal.tar.gz 2>/dev/null; then
-            EXTRACT_DIR=$(mktemp -d)
-            if tar xzf /tmp/kubeseal.tar.gz -C "$EXTRACT_DIR" 2>/dev/null && [ -f "$EXTRACT_DIR/kubeseal" ]; then
-                safe_install "$EXTRACT_DIR/kubeseal" /usr/local/bin/kubeseal \
-                    && rm -rf /tmp/kubeseal.tar.gz "$EXTRACT_DIR" && ok "kubeseal" \
-                    || fail "kubeseal (install failed)"
-            else
-                rm -rf /tmp/kubeseal.tar.gz "$EXTRACT_DIR"
-                fail "kubeseal (tar extraction failed — expected file: kubeseal-${KUBESEAL_VER}-${OS_NAME}-amd64.tar.gz)"
-            fi
-        else
-            fail "kubeseal (download failed — URL: $KUBESEAL_URL)"
-        fi
-    else
-        ok "kubeseal (installed)"
-    fi
-fi
-
-# shellcheck
-if ! command -v shellcheck &>/dev/null; then
-    if [ "$IS_WINDOWS" = true ]; then
-        skip "shellcheck (use chocolatey: choco install shellcheck)"
-    else
-        log "Installing shellcheck..."
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            brew install shellcheck 2>/dev/null && ok "shellcheck" || fail "shellcheck"
-        elif command -v apt-get &>/dev/null; then
-            sudo apt-get update >/dev/null && sudo apt-get install -y shellcheck >/dev/null 2>&1 && ok "shellcheck" || fail "shellcheck"
-        else
-            fail "shellcheck (unsupported package manager)"
-        fi
-    fi
-else
-    ok "shellcheck (installed)"
-fi
+# ── Pre-flight ────────────────────────────────────────────────────────────────
 
 echo ""
-echo "═══════════════════════════════════════════════════════════════════════"
-echo "Summary: $TOOLS_INSTALLED installed, $TOOLS_SKIPPED skipped, $TOOLS_FAILED failed"
+echo "╔══════════════════════════════════════╗"
+echo "║     Argus Infra — Tool Installer     ║"
+echo "╚══════════════════════════════════════╝"
+echo ""
+echo "  Detected OS: ${OS_TYPE}"
+echo ""
 
-# List essential tools for local k3d development
-ESSENTIAL_TOOLS=("kubectl" "helm" "k3d" "docker")
-ESSENTIAL_MISSING=0
+if [[ $EUID -eq 0 ]]; then
+  warn "Running as root — this is fine but not required."
+  echo ""
+fi
 
-for tool in "${ESSENTIAL_TOOLS[@]}"; do
-    if ! command -v "$tool" &>/dev/null; then
-        ESSENTIAL_MISSING=$((ESSENTIAL_MISSING+1))
+# ── System dependencies ───────────────────────────────────────────────────────
+
+if [[ "$OS_TYPE" == "linux" || "$OS_TYPE" == "wsl2" ]]; then
+  header "System dependencies"
+
+  # Ensure we're on a Debian-based system
+  if ! command -v apt-get &>/dev/null; then
+    fail "This script requires apt-get (Debian/Ubuntu)."
+    warn "On other Linux distros, install the following manually:"
+    warn "  curl wget git jq unzip build-essential python3 python3-pip"
+    exit 1
+  fi
+
+  # Explicit error check for apt-get update (Bug 5 fix)
+  if ! quiet sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq; then
+    warn "apt-get update failed — installs may fail. Try: sudo apt-get update manually"
+  fi
+
+  quiet sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+    curl wget git jq unzip build-essential \
+    software-properties-common gnupg ca-certificates \
+    python3 python3-venv python3-pip \
+    apt-transport-https lsb-release 2>/dev/null
+  ok "System dependencies installed"
+elif [[ "$OS_TYPE" == "macos" ]]; then
+  header "System dependencies"
+  if ! command -v brew &>/dev/null; then
+    info "Homebrew not found — installing..."
+    if /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" 2>&1; then
+      ok "Homebrew installed"
+    else
+      fail "Homebrew install failed. Install manually: https://brew.sh"
     fi
+  else
+    ok "Homebrew already installed"
+  fi
+  info "Installing dependencies via Homebrew..."
+  brew install curl wget git jq unzip python3 2>/dev/null || true
+  ok "System dependencies installed"
+elif [[ "$OS_TYPE" == "windows" ]]; then
+  header "System dependencies"
+  warn "On Windows (Git Bash), install the following manually:"
+  warn "  - Git for Windows (includes Git Bash)"
+  warn "  - Python 3 from https://python.org"
+  warn "  - Terraform, kubectl, helm via Chocolatey or manual download"
+  warn "  - Or use WSL2 for full Linux compatibility"
+  echo ""
+fi
+
+# ── Terraform ─────────────────────────────────────────────────────────────────
+
+header "Terraform ${TERRAFORM_VERSION}"
+
+install_terraform() {
+  local arch="amd64"
+  local url
+  if [[ "$OS_TYPE" == "macos" ]]; then
+    arch="amd64"
+    [[ "$(uname -m)" == "arm64" ]] && arch="arm64"
+    url="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_darwin_${arch}.zip"
+  else
+    url="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_${arch}.zip"
+  fi
+  local tmpdir
+  tmpdir=$(mktemp -d)
+
+  if ! quiet curl -fsSL "$url" -o "$tmpdir/terraform.zip"; then
+    fail "Failed to download Terraform ${TERRAFORM_VERSION}"
+    rm -rf "$tmpdir"
+    return 1
+  fi
+
+  if ! quiet unzip -q "$tmpdir/terraform.zip" -d "$tmpdir"; then
+    fail "Failed to unzip Terraform"
+    rm -rf "$tmpdir"
+    return 1
+  fi
+
+  install_binary "$tmpdir/terraform" "/usr/local/bin/terraform"
+  local rc=$?
+  rm -rf "$tmpdir"
+  return $rc
+}
+
+if command -v terraform &>/dev/null; then
+  current=$(terraform --version | head -1 | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
+  if [[ "$current" == "$TERRAFORM_VERSION" ]]; then
+    ok "Terraform ${TERRAFORM_VERSION} already installed"
+  else
+    warn "Terraform ${current} found — upgrading to ${TERRAFORM_VERSION}"
+    if install_terraform; then
+      ok "Terraform ${TERRAFORM_VERSION} installed"
+    else
+      fail "Terraform install failed"
+    fi
+  fi
+else
+  info "Installing Terraform ${TERRAFORM_VERSION}..."
+  if install_terraform; then
+    ok "Terraform ${TERRAFORM_VERSION} installed"
+  else
+    fail "Terraform install failed"
+  fi
+fi
+
+# ── Ansible + collections ─────────────────────────────────────────────────────
+
+header "Ansible"
+
+if command -v ansible &>/dev/null; then
+  ok "Ansible $(ansible --version | head -1 | grep -oP '\d+\.\d+\.\d+') already installed"
+else
+  if [[ "$OS_TYPE" == "linux" || "$OS_TYPE" == "wsl2" ]]; then
+    info "Installing Ansible via apt..."
+    if quiet sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ansible-core; then
+      ok "Ansible installed"
+    else
+      # Fallback to pip3 if apt fails (Bug 4 fix)
+      warn "apt install failed — trying pip3..."
+      quiet pip3 install --user ansible-core 2>/dev/null
+      # Add ~/.local/bin to PATH for this session (Bug 4 fix)
+      export PATH="$HOME/.local/bin:$PATH"
+      if command -v ansible &>/dev/null; then
+        ok "Ansible installed (pip3, ~/.local/bin)"
+      else
+        fail "Ansible install failed"
+      fi
+    fi
+  elif [[ "$OS_TYPE" == "macos" ]]; then
+    info "Installing Ansible via pip3..."
+    quiet pip3 install --user ansible-core 2>/dev/null
+    export PATH="$HOME/.local/bin:$PATH"
+    if command -v ansible &>/dev/null; then
+      ok "Ansible installed (pip3)"
+    else
+      fail "Ansible install failed"
+    fi
+  else
+    warn "Ansible not available on this OS — skipping"
+  fi
+fi
+
+# Install required Galaxy collections
+header "Ansible Galaxy collections"
+if command -v ansible-galaxy &>/dev/null; then
+  if [[ -f ansible/requirements.yml ]]; then
+    info "Installing collections from ansible/requirements.yml..."
+    if quiet ansible-galaxy collection install -r ansible/requirements.yml; then
+      ok "Ansible collections installed"
+    else
+      fail "Failed to install Ansible collections"
+    fi
+  else
+    warn "ansible/requirements.yml not found — skipping collection install"
+  fi
+
+  # Also install kubernetes.core collection (needed for K8s modules)
+  if ! ansible-galaxy collection list kubernetes.core &>/dev/null 2>&1; then
+    info "Installing kubernetes.core collection..."
+    if quiet ansible-galaxy collection install kubernetes.core; then
+      ok "kubernetes.core installed"
+    else
+      fail "kubernetes.core install failed"
+    fi
+  else
+    ok "kubernetes.core already installed"
+  fi
+else
+  warn "ansible-galaxy not available — skipping collection install"
+fi
+
+# ── kubectl (latest stable) ───────────────────────────────────────────────────
+
+header "kubectl"
+
+install_kubectl() {
+  local version
+  version=$(quiet curl -fsSL https://dl.k8s.io/release/stable.txt) || {
+    fail "Failed to determine latest kubectl version"
+    return 1
+  }
+
+  local url
+  if [[ "$OS_TYPE" == "macos" ]]; then
+    local arch="amd64"
+    [[ "$(uname -m)" == "arm64" ]] && arch="arm64"
+    url="https://dl.k8s.io/release/${version}/bin/darwin/${arch}/kubectl"
+  else
+    url="https://dl.k8s.io/release/${version}/bin/linux/amd64/kubectl"
+  fi
+
+  if ! quiet curl -fsSL "$url" -o /tmp/kubectl; then
+    fail "Failed to download kubectl"
+    return 1
+  fi
+
+  install_binary "/tmp/kubectl" "/usr/local/bin/kubectl"
+}
+
+if command -v kubectl &>/dev/null; then
+  ok "kubectl $(kubectl version --client 2>/dev/null | head -1 | grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+' || echo 'unknown') already installed"
+else
+  info "Installing kubectl..."
+  if install_kubectl; then
+    ok "kubectl installed"
+  else
+    fail "kubectl install failed"
+  fi
+fi
+
+# ── Helm 3 ────────────────────────────────────────────────────────────────────
+
+header "Helm 3"
+
+install_helm() {
+  local url
+  if [[ "$OS_TYPE" == "macos" ]]; then
+    local arch="amd64"
+    [[ "$(uname -m)" == "arm64" ]] && arch="arm64"
+    url="https://get.helm.sh/helm-v3.17.2-darwin-${arch}.tar.gz"
+  else
+    url="https://get.helm.sh/helm-v3.17.2-linux-amd64.tar.gz"
+  fi
+
+  if ! quiet curl -fsSL "$url" -o /tmp/helm.tar.gz; then
+    fail "Failed to download Helm"
+    return 1
+  fi
+
+  quiet tar xzf /tmp/helm.tar.gz -C /tmp/
+  if [[ "$OS_TYPE" == "macos" ]]; then
+    local arch="amd64"
+    [[ "$(uname -m)" == "arm64" ]] && arch="arm64"
+    install_binary "/tmp/darwin-${arch}/helm" "/usr/local/bin/helm"
+  else
+    install_binary "/tmp/linux-amd64/helm" "/usr/local/bin/helm"
+  fi
+  local rc=$?
+  rm -rf /tmp/helm.tar.gz /tmp/linux-amd64 /tmp/darwin-amd64 /tmp/darwin-arm64 2>/dev/null || true
+  return $rc
+}
+
+if command -v helm &>/dev/null; then
+  ok "Helm $(helm version --short 2>/dev/null | grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+' || echo 'unknown') already installed"
+else
+  info "Installing Helm..."
+  if install_helm; then
+    ok "Helm installed"
+  else
+    fail "Helm install failed"
+  fi
+fi
+
+# ── ArgoCD CLI (latest) ───────────────────────────────────────────────────────
+
+header "ArgoCD CLI"
+
+install_argocd() {
+  local url
+  if [[ "$OS_TYPE" == "macos" ]]; then
+    url="https://github.com/argoproj/argo-cd/releases/latest/download/argocd-darwin-amd64"
+  else
+    url="https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64"
+  fi
+
+  if ! quiet curl -fsSL "$url" -o /tmp/argocd; then
+    fail "Failed to download ArgoCD CLI"
+    return 1
+  fi
+
+  install_binary "/tmp/argocd" "/usr/local/bin/argocd"
+}
+
+if command -v argocd &>/dev/null; then
+  ok "ArgoCD CLI $(argocd version --client --short 2>/dev/null | head -1 || echo 'unknown') already installed"
+else
+  info "Installing ArgoCD CLI..."
+  if install_argocd; then
+    ok "ArgoCD CLI installed"
+  else
+    fail "ArgoCD CLI install failed"
+  fi
+fi
+
+# ── k3d (for local K8s cluster) ───────────────────────────────────────────────
+
+header "k3d"
+
+install_k3d() {
+  if ! quiet curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash; then
+    fail "k3d install script failed"
+    return 1
+  fi
+}
+
+if command -v k3d &>/dev/null; then
+  ok "k3d $(k3d --version 2>/dev/null | head -1 | grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+' || echo 'unknown') already installed"
+else
+  info "Installing k3d..."
+  if install_k3d; then
+    ok "k3d installed"
+  else
+    fail "k3d install failed"
+  fi
+fi
+
+# ── kubeseal (for SealedSecrets) ──────────────────────────────────────────────
+
+header "kubeseal"
+
+install_kubeseal() {
+  # Get latest version from GitHub API with fallback (Bug 3 fix)
+  local version
+  version=$(quiet curl -fsSL https://api.github.com/repos/bitnami-labs/sealed-secrets/releases/latest \
+    | grep '"tag_name":' | sed 's/.*"tag_name": "\(.*\)",.*/\1/') \
+    || version="v0.27.1"  # fallback if API rate-limited
+
+  if [[ -z "$version" ]]; then
+    version="v0.27.1"  # hardcoded fallback
+    warn "GitHub API rate-limited — using kubeseal ${version} as fallback"
+  fi
+
+  info "Latest kubeseal version: ${version}"
+
+  local url
+  if [[ "$OS_TYPE" == "macos" ]]; then
+    local arch="amd64"
+    [[ "$(uname -m)" == "arm64" ]] && arch="arm64"
+    url="https://github.com/bitnami-labs/sealed-secrets/releases/download/${version}/kubeseal-${version#v}-darwin-${arch}.tar.gz"
+  else
+    url="https://github.com/bitnami-labs/sealed-secrets/releases/download/${version}/kubeseal-${version#v}-linux-amd64.tar.gz"
+  fi
+
+  if ! quiet curl -fsSL "$url" -o /tmp/kubeseal.tar.gz; then
+    fail "Failed to download kubeseal from $url"
+    return 1
+  fi
+
+  quiet tar xzf /tmp/kubeseal.tar.gz -C /tmp/
+  install_binary "/tmp/kubeseal" "/usr/local/bin/kubeseal"
+  local rc=$?
+  rm -rf /tmp/kubeseal.tar.gz /tmp/kubeseal
+  return $rc
+}
+
+if command -v kubeseal &>/dev/null; then
+  ok "kubeseal $(kubeseal --version 2>/dev/null | grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+' || echo 'unknown') already installed"
+else
+  info "Installing kubeseal..."
+  if install_kubeseal; then
+    ok "kubeseal installed"
+  else
+    fail "kubeseal install failed"
+  fi
+fi
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+
+echo ""
+echo "╔══════════════════════════════════════╗"
+echo "║         Installation Summary         ║"
+echo "╚══════════════════════════════════════╝"
+echo ""
+
+all_ok=true
+for tool in terraform ansible kubectl helm argocd k3d kubeseal; do
+  if command -v "$tool" &>/dev/null; then
+    ok "$tool — $(command -v "$tool")"
+  else
+    fail "$tool — NOT INSTALLED"
+    all_ok=false
+  fi
 done
 
-if [ "$IS_WINDOWS" = true ]; then
-    echo ""
-    echo "⚠️  Windows detected — some tools require alternative installation:"
-    echo ""
-    echo "  For best experience on Windows, use one of these approaches:"
-    echo ""
-    echo "  1. Chocolatey package manager (recommended for Windows):"
-    echo "     choco install terraform kubernetes-cli kubernetes-helm k3d"
-    echo ""
-    echo "  2. WSL2 (Windows Subsystem for Linux):"
-    echo "     wsl --install"
-    echo "     Then run this script again inside WSL2"
-    echo ""
-    echo "  3. Docker Desktop with WSL2 backend:"
-    echo "     • Includes kubectl, helm, docker-compose"
-    echo "     • Run k3d clusters inside WSL2"
-    echo ""
+echo ""
+if $all_ok; then
+  ok "All tools installed successfully!"
+else
+  warn "Some tools failed to install. Check errors above."
 fi
-
-if [ $ESSENTIAL_MISSING -gt 0 ]; then
-    echo ""
-    echo "⚠️  Missing essential tools for local k3d development:"
-    for tool in "${ESSENTIAL_TOOLS[@]}"; do
-        if ! command -v "$tool" &>/dev/null; then
-            echo "  • $tool"
-        fi
-    done
-    exit 1
-fi
-
-if [ $TOOLS_FAILED -gt 3 ]; then
-    # Allow up to 3 failures (optional tools like kubeseal, argocd, terraform)
-    echo ""
-    echo "⚠️  Some tools failed to install. You can still use the cluster with essential tools."
-    echo ""
-fi
-
-echo "✅ Installation complete! Essential tools ready for k3d clusters."
-exit 0
+echo ""
+echo "Run 'bash scripts/versions.sh' for detailed version info."
+echo ""

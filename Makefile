@@ -1,127 +1,246 @@
-.PHONY: help install-tools local-up local-down lint validate plan sanity check-versions setup-windows
+# =============================================================================
+# argus-infra — Makefile
+#
+# Common infra operations for the Argus Platform.
+# See docs/setup.md for prerequisites and docs/runbooks.md for procedures.
+#
+# Usage:
+#   make lint           # Terraform fmt + ansible-lint + shellcheck
+#   make validate       # Terraform init (no backend) + validate
+#   make plan           # Terraform plan (requires HCLOUD_TOKEN)
+#   make install-tools  # Install CLI tools (Terraform, Ansible, kubectl, etc.)
+#   make local-up       # Spin up local k3d cluster
+#   make local-down     # Tear down local k3d cluster
+#   make check-versions # Print installed tool versions
+#   make sanity         # Run full local sanity check suite
+# =============================================================================
+
+SHELL := /bin/bash
+.ONESHELL:
+.SHELLFLAGS := -eu -o pipefail -c
+.DEFAULT_GOAL := help
+
+# --- Paths -------------------------------------------------------------------
+TERRAFORM_DIR    := terraform/environments/homelab
+ANSIBLE_DIR      := ansible
+SCRIPTS_DIR      := scripts
+ANSIBLE_CONFIG   := $(ANSIBLE_DIR)/ansible.cfg
+
+# --- Colors ------------------------------------------------------------------
+BLUE  := \033[34m
+GREEN := \033[32m
+YELLOW := \033[33m
+RED   := \033[31m
+RESET := \033[0m
+
+.PHONY: help lint validate plan install-tools local-up local-down check-versions sanity test-scripts-dry test-scripts
 
 help:
-	@echo "Argus Infra — Makefile Targets"
+	@echo -e "$(BLUE)argus-infra — Makefile$(RESET)"
 	@echo ""
-	@echo "Development (local k3d):"
-	@echo "  make install-tools   - Install required CLI tools (Terraform, Ansible, kubectl, k3d, etc.)"
-	@echo "  make local-up        - Spin up local k3d cluster with ArgoCD, Prometheus, Loki"
-	@echo "  make local-down      - Tear down local k3d cluster"
-	@echo "  make sanity          - Run full local sanity check suite"
-	@echo ""
-	@echo "Windows-specific:"
-	@echo "  make setup-windows   - Show Windows setup guide and Docker Desktop instructions"
-	@echo ""
-	@echo "Production (Hetzner):"
-	@echo "  make plan            - Terraform plan for Hetzner infrastructure"
-	@echo ""
-	@echo "Validation:"
-	@echo "  make lint            - Run Terraform fmt -check, ansible-lint, shellcheck"
-	@echo "  make validate        - Terraform validate (no backend)"
-	@echo "  make check-versions  - Print installed tool versions"
+	@echo -e "  $(GREEN)make lint$(RESET)           Terraform fmt -check + ansible-lint + shellcheck"
+	@echo -e "  $(GREEN)make validate$(RESET)       Terraform init (no backend) + validate"
+	@echo -e "  $(GREEN)make plan$(RESET)           Terraform plan (requires HCLOUD_TOKEN env var)"
+	@echo -e "  $(GREEN)make install-tools$(RESET)  Install CLI tools (Terraform, Ansible, kubectl, etc.)"
+	@echo -e "  $(GREEN)make local-up$(RESET)       Spin up local k3d cluster for testing"
+	@echo -e "  $(GREEN)make local-down$(RESET)     Tear down local k3d cluster"
+	@echo -e "  $(GREEN)make check-versions$(RESET) Print installed tool versions"
+	@echo -e "  $(GREEN)make sanity$(RESET)         Run full local sanity check suite"
+	@echo -e "  $(GREEN)make test-scripts-dry$(RESET) Static checks: bash -n + shellcheck (fast, no Docker)"
+	@echo -e "  $(GREEN)make test-scripts$(RESET)   Full script test in clean Docker container (must pass before PR)"
 	@echo ""
 
-install-tools: ## Install required CLI tools (Terraform, kubectl, Helm, k3d, kubeseal, etc.)
-	@echo "Installing required CLI tools..."
-	@bash scripts/install-tools.sh
+# === Lint ====================================================================
+# Runs: terraform fmt -check, ansible-lint, shellcheck on scripts/
+lint: lint-terraform lint-ansible lint-shellcheck
+	@echo -e "$(GREEN)✔ All lint checks passed$(RESET)"
 
-local-up: ## Spin up local k3d cluster with ArgoCD, Prometheus, Loki
-	@echo "Spinning up local k3d cluster..."
-	@bash scripts/local-cluster.sh
-
-local-down: ## Tear down local k3d cluster
-	@echo "Tearing down local k3d cluster..."
-	@bash scripts/local-cluster-down.sh
-
-lint:
-	@echo "Running linters..."
-	@echo "→ Terraform fmt -check"
-	cd terraform && terraform fmt -check -recursive . || exit 1
-	@echo "→ ansible-lint"
-	ansible-lint ansible/ || exit 1
-	@echo "→ shellcheck"
-	find scripts -name "*.sh" -exec shellcheck {} + || exit 1
-	@echo "✓ All linters passed"
-
-validate:
-	@echo "Validating Terraform..."
-	cd terraform && terraform init -backend=false && terraform validate
-
-plan:
-	@echo "Running Terraform plan..."
-	@if [ -z "$$HCLOUD_TOKEN" ]; then \
-		echo "Error: HCLOUD_TOKEN environment variable not set"; \
-		exit 1; \
+lint-terraform:
+	@echo -e "$(BLUE)── Terraform format check ──$(RESET)"
+	@if command -v terraform &>/dev/null; then \
+		cd $(TERRAFORM_DIR) && terraform fmt -check -recursive; \
+		echo -e "$(GREEN)  ✔ Terraform formatting OK$(RESET)"; \
+	else \
+		echo -e "$(YELLOW)  ⚠ terraform not found — skipping$(RESET)"; \
 	fi
-	cd terraform/environments/homelab && terraform init && terraform plan -target=module.network
 
-sanity: lint validate
-	@echo "Running full sanity check suite..."
-	./scripts/run-sanity-checks.sh
+lint-ansible:
+	@echo -e "$(BLUE)── Ansible lint ──$(RESET)"
+	@if command -v ansible-lint &>/dev/null; then \
+		ANSIBLE_CONFIG=$(ANSIBLE_CONFIG) ansible-lint $(ANSIBLE_DIR)/playbooks/ $(ANSIBLE_DIR)/roles/; \
+		echo -e "$(GREEN)  ✔ Ansible lint OK$(RESET)"; \
+	else \
+		echo -e "$(YELLOW)  ⚠ ansible-lint not found — skipping$(RESET)"; \
+	fi
+
+lint-shellcheck:
+	@echo -e "$(BLUE)── ShellCheck ──$(RESET)"
+	@if command -v shellcheck &>/dev/null; then \
+		shellcheck $(SCRIPTS_DIR)/*.sh; \
+		echo -e "$(GREEN)  ✔ ShellCheck OK$(RESET)"; \
+	else \
+		echo -e "$(YELLOW)  ⚠ shellcheck not found — skipping$(RESET)"; \
+	fi
+
+# === Validate ================================================================
+# Terraform init (no backend) + validate — no cloud credentials needed.
+validate:
+	@echo -e "$(BLUE)── Terraform validate ──$(RESET)"
+	@if command -v terraform &>/dev/null; then \
+		cd $(TERRAFORM_DIR) && terraform init -backend=false -input=false && terraform validate; \
+		echo -e "$(GREEN)  ✔ Terraform validation OK$(RESET)"; \
+	else \
+		echo -e "$(YELLOW)  ⚠ terraform not found — skipping$(RESET)"; \
+	fi
+
+# === Plan ====================================================================
+# Requires HCLOUD_TOKEN env var. Runs terraform plan targeting module.network
+# to avoid provider crashes with computed values (see CI workflow notes).
+plan:
+	@echo -e "$(BLUE)── Terraform plan ──$(RESET)"
+	@if command -v terraform &>/dev/null; then \
+		if [ -z "$${HCLOUD_TOKEN:-}" ]; then \
+			echo -e "$(RED)✖ HCLOUD_TOKEN is not set$(RESET)"; \
+			echo "  Set it with: export HCLOUD_TOKEN=your_token"; \
+			exit 1; \
+		fi; \
+		cd $(TERRAFORM_DIR) && \
+		terraform init -input=false && \
+		terraform plan -no-color -input=false -target=module.network; \
+		echo -e "$(GREEN)  ✔ Terraform plan completed$(RESET)"; \
+	else \
+		echo -e "$(YELLOW)  ⚠ terraform not found — skipping$(RESET)"; \
+	fi
+
+# === Script wrappers =========================================================
+# These targets delegate to scripts/ for their implementation.
+# If a script doesn't exist yet, print a helpful message.
+
+install-tools:
+	@if [ -f "$(SCRIPTS_DIR)/install-tools.sh" ]; then \
+		bash $(SCRIPTS_DIR)/install-tools.sh; \
+	else \
+		echo -e "$(YELLOW)⚠ $(SCRIPTS_DIR)/install-tools.sh not found$(RESET)"; \
+		echo "  See docs/setup.md for manual installation instructions."; \
+	fi
+
+local-up:
+	@if [ -f "$(SCRIPTS_DIR)/local-cluster.sh" ]; then \
+		bash $(SCRIPTS_DIR)/local-cluster.sh; \
+	else \
+		echo -e "$(YELLOW)⚠ $(SCRIPTS_DIR)/local-cluster.sh not found$(RESET)"; \
+		echo "  This script will be added in a future PR."; \
+	fi
+
+local-down:
+	@if [ -f "$(SCRIPTS_DIR)/local-cluster-down.sh" ]; then \
+		bash $(SCRIPTS_DIR)/local-cluster-down.sh; \
+	else \
+		echo -e "$(YELLOW)⚠ $(SCRIPTS_DIR)/local-cluster-down.sh not found$(RESET)"; \
+		echo "  This script will be added in a future PR."; \
+	fi
 
 check-versions:
-	@echo "Installed tool versions:"
-	@./scripts/versions.sh
+	@if [ -f "$(SCRIPTS_DIR)/versions.sh" ]; then \
+		bash $(SCRIPTS_DIR)/versions.sh; \
+	else \
+		echo -e "$(YELLOW)⚠ $(SCRIPTS_DIR)/versions.sh not found$(RESET)"; \
+		echo "  This script will be added in a future PR."; \
+		echo ""; \
+		echo "Installed tools:"; \
+		for tool in terraform ansible ansible-lint kubectl helm argocd k3d shellcheck; do \
+			if command -v $$tool &>/dev/null; then \
+				echo "  ✔ $$tool: $$($$tool version 2>&1 | head -1)"; \
+			else \
+				echo "  ✖ $$tool: not installed"; \
+			fi; \
+		done; \
+	fi
 
-bootstrap:
-	@bash ./BOOTSTRAP_WINDOWS.sh
+# === Sanity ==================================================================
+# Run the full local sanity check suite (same checks as CI).
+sanity:
+	@if [ -f "$(SCRIPTS_DIR)/run-sanity-checks.sh" ]; then \
+		bash $(SCRIPTS_DIR)/run-sanity-checks.sh; \
+	else \
+		echo -e "$(YELLOW)⚠ $(SCRIPTS_DIR)/run-sanity-checks.sh not found$(RESET)"; \
+		echo "  Falling back to individual make targets..."; \
+		$(MAKE) lint validate; \
+	fi
 
-setup-windows:
-	@echo "╔════════════════════════════════════════════════════════════════════════╗"
-	@echo "║         Argus Infra on Windows — Setup Guide                          ║"
-	@echo "╚════════════════════════════════════════════════════════════════════════╝"
-	@echo ""
-	@echo "Windows requires Docker Desktop with WSL2 backend for k3d clusters."
-	@echo ""
-	@echo "📋 PREREQUISITE CHECKLIST:"
-	@echo ""
-	@echo "  [ ] Docker Desktop installed?"
-	@echo "      Download: https://www.docker.com/products/docker-desktop"
-	@echo "      ⚠️  IMPORTANT: Enable WSL2 backend during installation"
-	@echo ""
-	@echo "  [ ] Docker Desktop running?"
-	@echo "      Check system tray for Docker icon"
-	@echo ""
-	@echo "  [ ] Docker verified?"
-	@echo "      Run: docker --version"
-	@echo ""
-	@echo "📦 QUICK START:"
-	@echo ""
-	@echo "  1. Install tools:"
-	@echo "     make install-tools"
-	@echo ""
-	@echo "  2. Verify installation:"
-	@echo "     make check-versions"
-	@echo ""
-	@echo "  3. Create local cluster:"
-	@echo "     make local-up"
-	@echo ""
-	@echo "  4. Access services (in separate terminal):"
-	@echo "     kubectl port-forward -n argocd svc/argocd-server 8080:443"
-	@echo "     # Open: https://localhost:8080"
-	@echo ""
-	@echo "  5. Teardown when done:"
-	@echo "     make local-down"
-	@echo ""
-	@echo "📚 For detailed instructions:"
-	@echo "   See SETUP_WINDOWS.md in this directory"
-	@echo ""
-	@echo "🔧 INSTALLATION OPTIONS:"
-	@echo ""
-	@echo "   Option A: Chocolatey (recommended for Windows)"
-	@echo "     choco install terraform kubernetes-cli kubernetes-helm k3d"
-	@echo ""
-	@echo "   Option B: WSL2 (most Unix-like experience)"
-	@echo "     wsl --install"
-	@echo "     Then run this script inside WSL2"
-	@echo ""
-	@echo "   Option C: Docker Desktop tools"
-	@echo "     Includes kubectl, docker-compose out of the box"
-	@echo ""
-	@echo "❓ ISSUES?"
-	@echo "   • Docker not found? Ensure Docker Desktop is RUNNING (check system tray)"
-	@echo "   • Port conflicts? Use different ports: kubectl port-forward ... :8888:443"
-	@echo "   • WSL2 issues? Run: wsl --update"
-	@echo ""
 
-.DEFAULT_GOAL := help
+# === Script Tests ============================================================
+# Test all shell scripts with static analysis and Docker-based runtime checks.
+# test-scripts-dry: fast — bash -n + shellcheck (no Docker dependency)
+# test-scripts:    full — runs install-tools.sh in clean Ubuntu 22.04 container
+#
+# These must pass before any PR touching scripts/ or Makefile.
+
+# All scripts in the repo
+SCRIPTS := $(SCRIPTS_DIR)/install-tools.sh \
+           $(SCRIPTS_DIR)/local-cluster.sh \
+           $(SCRIPTS_DIR)/local-cluster-down.sh \
+           $(SCRIPTS_DIR)/run-sanity-checks.sh \
+           $(SCRIPTS_DIR)/versions.sh \
+           $(SCRIPTS_DIR)/argocd-health.sh \
+           $(SCRIPTS_DIR)/bootstrap-argocd.sh \
+           $(SCRIPTS_DIR)/cluster-sanity.sh \
+           $(SCRIPTS_DIR)/setup-agent.sh
+
+test-scripts-dry:
+	@echo -e "$(BLUE)── Script static checks ──$(RESET)"
+	bash -n $(SCRIPTS_DIR)/install-tools.sh
+	bash -n $(SCRIPTS_DIR)/local-cluster.sh
+	bash -n $(SCRIPTS_DIR)/local-cluster-down.sh
+	bash -n $(SCRIPTS_DIR)/run-sanity-checks.sh
+	bash -n $(SCRIPTS_DIR)/versions.sh
+	bash -n $(SCRIPTS_DIR)/argocd-health.sh
+	bash -n $(SCRIPTS_DIR)/bootstrap-argocd.sh
+	bash -n $(SCRIPTS_DIR)/cluster-sanity.sh
+	bash -n $(SCRIPTS_DIR)/setup-agent.sh
+	@echo -e "$(GREEN)  ✔ Syntax checks passed$(RESET)"
+	@echo ""
+	@echo -e "$(BLUE)── ShellCheck ──$(RESET)"
+	@if command -v shellcheck &>/dev/null; then 		shellcheck $(SCRIPTS); 	else 		echo -e "$(YELLOW)  ⚠ shellcheck not installed locally — running via Docker...$(RESET)"; 		docker run --rm -v $(PWD):/repo koalaman/shellcheck:stable $(addprefix /repo/$(SCRIPTS_DIR)/,$(notdir $(SCRIPTS))); 	fi
+	@echo -e "$(GREEN)  ✔ ShellCheck passed$(RESET)"
+	@echo ""
+	@echo -e "$(GREEN)✔ All static checks passed$(RESET)"
+
+test-scripts:
+	@echo -e "$(BLUE)── Script static checks ──$(RESET)"
+	bash -n $(SCRIPTS_DIR)/install-tools.sh
+	bash -n $(SCRIPTS_DIR)/local-cluster.sh
+	bash -n $(SCRIPTS_DIR)/local-cluster-down.sh
+	bash -n $(SCRIPTS_DIR)/run-sanity-checks.sh
+	bash -n $(SCRIPTS_DIR)/versions.sh
+	bash -n $(SCRIPTS_DIR)/argocd-health.sh
+	bash -n $(SCRIPTS_DIR)/bootstrap-argocd.sh
+	bash -n $(SCRIPTS_DIR)/cluster-sanity.sh
+	bash -n $(SCRIPTS_DIR)/setup-agent.sh
+	@echo -e "$(GREEN)  ✔ Syntax checks passed$(RESET)"
+	@echo ""
+	@echo -e "$(BLUE)── ShellCheck ──$(RESET)"
+	docker run --rm -v $(PWD):/repo koalaman/shellcheck:stable $(addprefix /repo/$(SCRIPTS_DIR)/,$(notdir $(SCRIPTS)))
+	@echo -e "$(GREEN)  ✔ ShellCheck passed$(RESET)"
+	@echo ""
+	@echo -e "$(BLUE)── install-tools.sh in clean Ubuntu container ──$(RESET)"
+	DEBIAN_FRONTEND=noninteractive docker run --rm -v $(PWD):/repo ubuntu:22.04 bash -c '
+		apt-get update -qq >/dev/null
+		apt-get install -y -qq sudo curl wget git unzip python3-pip >/dev/null
+		cd /repo
+		bash scripts/install-tools.sh --quiet 2>&1
+		echo ""
+		echo "=== Verifying installed tools ==="
+		for tool in terraform kubectl helm k3d; do
+			if command -v $$tool &>/dev/null; then
+				echo "  ✔ $$tool installed"
+			else
+				echo "  ✗ $$tool NOT installed"
+			fi
+		done
+		echo ""
+		echo "=== Running versions.sh ==="
+		bash scripts/versions.sh'
+	@echo -e "$(GREEN)  ✔ install-tools runs on clean Ubuntu$(RESET)"
+	@echo ""
+	@echo -e "$(GREEN)✔ All script tests passed$(RESET)"

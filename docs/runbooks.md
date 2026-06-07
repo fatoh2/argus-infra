@@ -71,9 +71,7 @@ The root `Makefile` provides convenient shortcuts for common operations:
 | `make local-down` | Tear down local k3d cluster |
 | `make check-versions` | Print installed tool versions |
 | `make sanity` | Run full local sanity check suite |
-| `make test-scripts-dry` | Static checks: bash -n + shellcheck (fast, no Docker) |
-| `make test-scripts` | Full script test in clean Docker container (must pass before PR) |
-| `make setup-windows` | Show Windows setup guide |
+| `make setup-windows` | *(removed — see SETUP_WINDOWS.md for Windows setup)* |
 | `make bootstrap` | Run Windows bootstrap script (`BOOTSTRAP_WINDOWS.sh`) |
 
 All targets gracefully skip missing tools. Run `make` (or `make help`) to see the full list.
@@ -812,4 +810,4 @@ ssh argus@<public-ip> "docker --version && docker compose version"
 
 ### Module Reference
 
-See the [architecture documentation](architecture.md#18-aws-ec2-module) for the complete module reference (all variables, outputs, and configuration options). See [ADR 0006](adr/0006-aws-ec2-module.md) for the architecture decision record.
+See the [architecture documentation](architecture.md#17-aws-ec2-module) for the complete module reference (all variables, outputs, and configuration options). See [ADR 0006](adr/0006-aws-ec2-module.md) for the architecture decision record.

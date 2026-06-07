@@ -52,3 +52,8 @@ output "iam_role_arn" {
   description = "The ARN of the IAM role."
   value       = module.argus_vm.iam_role_arn
 }
+
+output "instance_public_ip" {
+  description = "Alias for public_ip — the public IP address of the instance."
+  value       = module.argus_vm.instance_public_ip
+}

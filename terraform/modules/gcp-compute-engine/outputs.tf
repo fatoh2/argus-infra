@@ -62,3 +62,14 @@ output "firewall_rule_names" {
     local.fw_https,
   ] : []
 }
+
+# ---------------------------------------------------------------------------
+# Standardized outputs (as requested by argus-infra issue #69)
+# ---------------------------------------------------------------------------
+output "instance_public_ip" {
+  description = "Alias for nat_ip — the external (public) IP address of the instance, if enabled."
+  value = var.enable_public_ip ? try(
+    google_compute_instance.this.network_interface[0].access_config[0].nat_ip,
+    null
+  ) : null
+}
