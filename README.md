@@ -2,9 +2,10 @@
 
 [![Sanity Checks](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/sanity-checks.yml)
 [![Cluster Sanity](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cluster-sanity.yml)
-[![CD Deploy](https://github.com/fatoh2/argus-infra/actions/workflows/cd-deploy.yml/badge.svg)](https://github.com/fatoh2/argus-infra/actions/workflows/cd-deploy.yml)
 
-**A production-grade Kubernetes homelab platform** — provisioned with Terraform (Hetzner Cloud / GCP Compute Engine / GKE / AWS EC2 / AWS EKS), configured with Ansible, and managed via GitOps with ArgoCD.
+**A production-oriented Kubernetes platform blueprint** — provisioned with Terraform (Hetzner Cloud / GCP Compute Engine / GKE / AWS EC2 / AWS EKS), configured with Ansible, and managed via GitOps with ArgoCD.
+
+[View the portfolio case study](https://fhaj.vercel.app/work/argus-infra)
 
 ## Overview
 
